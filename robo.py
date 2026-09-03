@@ -93,7 +93,6 @@ def raspar_linkedin(cargo, localidade, apenas_remoto=False):
             if tit_elem and emp_elem and lnk_elem:
                 link = limpar_link(lnk_elem["href"])
                 
-                # Descarta na hora se a vaga já estiver fechada
                 if not vaga_ainda_ativa(link):
                     continue
                     
@@ -111,20 +110,19 @@ def raspar_linkedin(cargo, localidade, apenas_remoto=False):
                     "tipo": tipo,
                     "modalidade": "Remoto" if is_remoto else "Presencial",
                     "area": classificar_area(titulo),
+                    "fonte": "LinkedIn",
                     "link": link
                 })
     except Exception as e:
         print(f"Erro LinkedIn ({cargo}): {e}")
     return vagas
 
-
 # ==========================================
-# FONTE: INFOJOBS
+# FONTE 2: INFOJOBS
 # ==========================================
 def raspar_infojobs(termo_busca, uf="pe"):
     """
     Raspa anúncios de vagas públicas do InfoJobs por cargo e estado.
-    Exemplo: termo_busca='suporte-ti', uf='pe'
     """
     vagas = []
     headers_infojobs = {
@@ -133,7 +131,6 @@ def raspar_infojobs(termo_busca, uf="pe"):
         "Referer": "https://www.infojobs.com.br/"
     }
     
-    # Formata termo de busca para a URL do InfoJobs (ex: "suporte ti" -> "suporte-ti")
     slug_termo = termo_busca.lower().strip().replace(" ", "-")
     url = f"https://www.infojobs.com.br/vagas-de-emprego-{slug_termo}-em-{uf}.aspx"
     
@@ -143,15 +140,12 @@ def raspar_infojobs(termo_busca, uf="pe"):
             return vagas
             
         soup = BeautifulSoup(res.text, "html.parser")
-        
-        # O InfoJobs encapsula as vagas em elementos com atributo data-js="vacancy-item" ou tags <div> com js-vacancy-item
         cards = soup.find_all("div", class_=lambda c: c and "js_vacancy" in c) or soup.find_all("div", attrs={"data-js": "vacancy-item"})
         
         for card in cards:
             tit_elem = card.find("h2") or card.find("a", class_=lambda c: c and "title" in c)
             emp_elem = card.find("div", class_=lambda c: c and "company" in c) or card.find("a", class_=lambda c: c and "company" in c)
             loc_elem = card.find("div", class_=lambda c: c and "location" in c) or card.find("span", class_=lambda c: c and "location" in c)
-            
             lnk_elem = card.find("a", href=True)
             
             if tit_elem and lnk_elem:
@@ -161,8 +155,6 @@ def raspar_infojobs(termo_busca, uf="pe"):
                 
                 link_relativo = lnk_elem["href"]
                 link_completo = link_relativo if link_relativo.startswith("http") else f"https://www.infojobs.com.br{link_relativo}"
-                
-                # Descarte de rastreamento do link
                 link_limpo = limpar_link(link_completo)
                 
                 is_remoto = any(k in f"{local} {titulo}".lower() for k in ["remoto", "home office", "teletrabalho"])
@@ -175,6 +167,7 @@ def raspar_infojobs(termo_busca, uf="pe"):
                     "tipo": tipo,
                     "modalidade": "Remoto" if is_remoto else "Presencial",
                     "area": classificar_area(titulo),
+                    "fonte": "InfoJobs",
                     "link": link_limpo
                 })
     except Exception as e:
@@ -182,13 +175,11 @@ def raspar_infojobs(termo_busca, uf="pe"):
         
     return vagas
 
-
 # ==========================================
-# FONTE 2: GUPY (API Pública da Gupy)
+# FONTE 3: GUPY (API Pública da Gupy)
 # ==========================================
 def raspar_gupy(termo_busca):
     vagas = []
-    # A Gupy possui um endpoint aberto de busca que retorna JSON direto
     url = f"https://portal.api.gupy.io/api/v1/jobs?jobName={urllib.parse.quote(termo_busca)}&limit=20"
     
     try:
@@ -206,8 +197,6 @@ def raspar_gupy(termo_busca):
             link = item.get("jobUrl", "")
             
             local_str = f"{cidade} - {estado}" if cidade else ("Remoto" if is_remoto else "Brasil")
-            
-            # Filtro de localidade: Remoto OU Pernambuco/RMR
             local_lower = f"{local_str} {cidade} {estado}".lower()
             valido_local = any(c in local_lower for c in ["recife", "cabo", "ipojuca", "suape", "pernambuco", "pe", "jaboatão"])
             
@@ -223,6 +212,7 @@ def raspar_gupy(termo_busca):
                 "tipo": tipo,
                 "modalidade": "Remoto" if is_remoto else "Presencial",
                 "area": classificar_area(titulo),
+                "fonte": "Gupy",
                 "link": link
             })
     except Exception as e:
@@ -239,17 +229,15 @@ def atualizar_banco():
     # 1. Buscas no LinkedIn
     buscas_linkedin = [
         {"cargo": "Tecnico de Suporte", "local": "Pernambuco, Brazil", "remoto": False},
-    {"cargo": "Tecnico de Informatica", "local": "Pernambuco, Brazil", "remoto": False},
-    {"cargo": "Suporte TI", "local": "Recife, Pernambuco, Brazil", "remoto": False},
-    {"cargo": "Analista de Suporte", "local": "Recife, Pernambuco, Brazil", "remoto": False},
-    {"cargo": "Suporte Tecnico", "local": "Pernambuco, Brazil", "remoto": False},
-    {"cargo": "Suporte TI", "local": "Cabo de Santo Agostinho, Pernambuco, Brazil", "remoto": False},
-    
-    # Remoto
-    {"cargo": "Tecnico de Suporte Remoto", "local": "Brazil", "remoto": True},
-    {"cargo": "Analista de Suporte Remoto", "local": "Brazil", "remoto": True},
-    {"cargo": "Desenvolvedor Python", "local": "Brazil", "remoto": True},
-    {"cargo": "Desenvolvedor Junior", "local": "Brazil", "remoto": True}
+        {"cargo": "Tecnico de Informatica", "local": "Pernambuco, Brazil", "remoto": False},
+        {"cargo": "Suporte TI", "local": "Recife, Pernambuco, Brazil", "remoto": False},
+        {"cargo": "Analista de Suporte", "local": "Recife, Pernambuco, Brazil", "remoto": False},
+        {"cargo": "Suporte Tecnico", "local": "Pernambuco, Brazil", "remoto": False},
+        {"cargo": "Suporte TI", "local": "Cabo de Santo Agostinho, Pernambuco, Brazil", "remoto": False},
+        {"cargo": "Tecnico de Suporte Remoto", "local": "Brazil", "remoto": True},
+        {"cargo": "Analista de Suporte Remoto", "local": "Brazil", "remoto": True},
+        {"cargo": "Desenvolvedor Python", "local": "Brazil", "remoto": True},
+        {"cargo": "Desenvolvedor Junior", "local": "Brazil", "remoto": True}
     ]
     for b in buscas_linkedin:
         todas.extend(raspar_linkedin(b["cargo"], b["local"], b["remoto"]))
@@ -259,7 +247,7 @@ def atualizar_banco():
     for termo in termos_gupy:
         todas.extend(raspar_gupy(termo))
 
-    # Buscas no InfoJobs (foco em Pernambuco e termos estratégicos)
+    # 3. Buscas no InfoJobs
     termos_infojobs = [
         "suporte ti",
         "tecnico informatica",
@@ -270,13 +258,13 @@ def atualizar_banco():
     for termo in termos_infojobs:
         todas.extend(raspar_infojobs(termo, uf="pe"))
 
-
-    # Recupera enviadas anteriores
+    # Recupera status de envio anterior
     enviadas_prev = {}
     if os.path.exists(ARQUIVO_CSV):
         try:
             df_old = pd.read_csv(ARQUIVO_CSV)
-            enviadas_prev = df_old.set_index("link")["enviada"].to_dict()
+            if "link" in df_old.columns and "enviada" in df_old.columns:
+                enviadas_prev = df_old.set_index("link")["enviada"].to_dict()
         except Exception:
             pass
 
@@ -286,7 +274,7 @@ def atualizar_banco():
     id_n = 1
 
     for v in todas:
-        chave = f"{v['titulo'].lower()}_{v['empresa'].lower()}"
+        chave = f"{v['titulo'].lower().strip()}_{v['empresa'].lower().strip()}"
         if chave in vistas or v["link"] in vistas:
             continue
         vistas.add(chave)
@@ -301,6 +289,7 @@ def atualizar_banco():
             "tipo": v["tipo"],
             "modalidade": v["modalidade"],
             "area": v["area"],
+            "fonte": v.get("fonte", "Outros"),
             "aderencia": aderencia,
             "tags": tags,
             "link": v["link"],
@@ -310,7 +299,7 @@ def atualizar_banco():
 
     df_novo = pd.DataFrame(processadas)
     df_novo.to_csv(ARQUIVO_CSV, index=False, encoding="utf-8")
-    print(f"✅ Banco consolidado com {len(df_novo)} vagas ativas (LinkedIn + Gupy).")
+    print(f"✅ Banco consolidado com {len(df_novo)} vagas ativas (LinkedIn, Gupy e InfoJobs).")
 
 if __name__ == "__main__":
     atualizar_banco()
