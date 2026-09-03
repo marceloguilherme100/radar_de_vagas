@@ -42,11 +42,39 @@ def limpar_link(url_bruta):
 # ==========================================
 # FONTE 1: LINKEDIN
 # ==========================================
+def vaga_ainda_ativa(url_vaga):
+    """Verifica se a vaga ainda está aceitando candidaturas."""
+    try:
+        res = requests.get(url_vaga, headers=HEADERS, timeout=5)
+        if res.status_code != 200:
+            return False
+        
+        texto_pagina = res.text.lower()
+        
+        # Padrões que indicam vaga encerrada/expirada no LinkedIn
+        termos_fechada = [
+            "não aceita mais candidaturas",
+            "nao aceita mais candidaturas",
+            "no longer accepting applications",
+            "closed-job",
+            "vaga encerrada"
+        ]
+        
+        if any(termo in texto_pagina for termo in termos_fechada):
+            return False
+            
+        return True
+    except Exception:
+        # Em caso de falha de timeout, mantém para não descartar indevidamente
+        return True
+
 def raspar_linkedin(cargo, localidade, apenas_remoto=False):
     vagas = []
     q_enc = urllib.parse.quote(cargo)
     loc_enc = urllib.parse.quote(localidade)
-    url = f"https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={q_enc}&location={loc_enc}&start=0"
+    
+    # f_TPR=r604800 filtra apenas anúncios dos últimos 7 dias
+    url = f"https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={q_enc}&location={loc_enc}&f_TPR=r604800&start=0"
     if apenas_remoto:
         url += "&f_WT=2"
         
@@ -63,10 +91,15 @@ def raspar_linkedin(cargo, localidade, apenas_remoto=False):
             lnk_elem = card.find("a", class_="base-card__full-link")
             
             if tit_elem and emp_elem and lnk_elem:
+                link = limpar_link(lnk_elem["href"])
+                
+                # Descarta na hora se a vaga já estiver fechada
+                if not vaga_ainda_ativa(link):
+                    continue
+                    
                 titulo = tit_elem.get_text(strip=True)
                 empresa = emp_elem.get_text(strip=True)
                 local = loc_elem.get_text(strip=True) if loc_elem else localidade
-                link = limpar_link(lnk_elem["href"])
                 
                 is_remoto = apenas_remoto or any(k in f"{local} {titulo}".lower() for k in ["remoto", "remote", "home office"])
                 tipo = "Indústria" if any(k in f"{local} {empresa}".lower() for k in ["suape", "cabo", "ipojuca", "porto", "indústria"]) else "Geral"
