@@ -18,17 +18,6 @@ SKILLS_REGEX = {
     "Automação / RPA": r"\bautoma[cç][aã]o\b|\brpa\b"
 }
 
-SEARCH_QUERIES = [
-    {"cargo": "Suporte TI", "local": "Recife, Pernambuco, Brazil", "remoto": False},
-    {"cargo": "Analista de TI", "local": "Recife, Pernambuco, Brazil", "remoto": False},
-    {"cargo": "Técnico de Informática", "local": "Pernambuco, Brazil", "remoto": False},
-    {"cargo": "Assistente de TI", "local": "Pernambuco, Brazil", "remoto": False},
-    {"cargo": "Suporte TI", "local": "Cabo de Santo Agostinho, Pernambuco, Brazil", "remoto": False},
-    {"cargo": "Desenvolvedor Python", "local": "Brazil", "remoto": True},
-    {"cargo": "Desenvolvedor Júnior", "local": "Brazil", "remoto": True},
-    {"cargo": "Programador", "local": "Brazil", "remoto": True}
-]
-
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
@@ -50,6 +39,9 @@ def limpar_link(url_bruta):
     parsed = urllib.parse.urlparse(url_bruta)
     return f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
 
+# ==========================================
+# FONTE 1: LINKEDIN
+# ==========================================
 def raspar_linkedin(cargo, localidade, apenas_remoto=False):
     vagas = []
     q_enc = urllib.parse.quote(cargo)
@@ -77,7 +69,7 @@ def raspar_linkedin(cargo, localidade, apenas_remoto=False):
                 link = limpar_link(lnk_elem["href"])
                 
                 is_remoto = apenas_remoto or any(k in f"{local} {titulo}".lower() for k in ["remoto", "remote", "home office"])
-                tipo = "Indústria" if any(k in f"{local} {empresa}".lower() for k in ["suape", "cabo", "ipojuca", "porto"]) else "Geral"
+                tipo = "Indústria" if any(k in f"{local} {empresa}".lower() for k in ["suape", "cabo", "ipojuca", "porto", "indústria"]) else "Geral"
                 
                 vagas.append({
                     "titulo": titulo,
@@ -89,14 +81,80 @@ def raspar_linkedin(cargo, localidade, apenas_remoto=False):
                     "link": link
                 })
     except Exception as e:
-        print(f"Erro em {cargo}: {e}")
+        print(f"Erro LinkedIn ({cargo}): {e}")
     return vagas
 
+# ==========================================
+# FONTE 2: GUPY (API Pública da Gupy)
+# ==========================================
+def raspar_gupy(termo_busca):
+    vagas = []
+    # A Gupy possui um endpoint aberto de busca que retorna JSON direto
+    url = f"https://portal.api.gupy.io/api/v1/jobs?jobName={urllib.parse.quote(termo_busca)}&limit=20"
+    
+    try:
+        res = requests.get(url, headers=HEADERS, timeout=10)
+        if res.status_code != 200:
+            return vagas
+            
+        dados = res.json()
+        for item in dados.get("data", []):
+            titulo = item.get("name", "")
+            empresa = item.get("careerPageName", "Empresa via Gupy")
+            cidade = item.get("city", "")
+            estado = item.get("state", "")
+            is_remoto = item.get("isRemoteWork", False)
+            link = item.get("jobUrl", "")
+            
+            local_str = f"{cidade} - {estado}" if cidade else ("Remoto" if is_remoto else "Brasil")
+            
+            # Filtro de localidade: Remoto OU Pernambuco/RMR
+            local_lower = f"{local_str} {cidade} {estado}".lower()
+            valido_local = any(c in local_lower for c in ["recife", "cabo", "ipojuca", "suape", "pernambuco", "pe", "jaboatão"])
+            
+            if not (is_remoto or valido_local):
+                continue
+
+            tipo = "Indústria" if any(k in f"{local_str} {empresa}".lower() for k in ["suape", "cabo", "ipojuca", "indústria"]) else "Geral"
+
+            vagas.append({
+                "titulo": titulo,
+                "empresa": empresa,
+                "local": "Remoto (Brasil)" if is_remoto else local_str,
+                "tipo": tipo,
+                "modalidade": "Remoto" if is_remoto else "Presencial",
+                "area": classificar_area(titulo),
+                "link": link
+            })
+    except Exception as e:
+        print(f"Erro Gupy ({termo_busca}): {e}")
+    return vagas
+
+# ==========================================
+# COORDENADOR DE ATUALIZAÇÃO
+# ==========================================
 def atualizar_banco():
     todas = []
-    for b in SEARCH_QUERIES:
+    print("🚀 Buscando vagas em múltiplas plataformas...")
+
+    # 1. Buscas no LinkedIn
+    buscas_linkedin = [
+        {"cargo": "Suporte TI", "local": "Recife, Pernambuco, Brazil", "remoto": False},
+        {"cargo": "Analista de TI", "local": "Recife, Pernambuco, Brazil", "remoto": False},
+        {"cargo": "Técnico de Informática", "local": "Pernambuco, Brazil", "remoto": False},
+        {"cargo": "Suporte TI", "local": "Cabo de Santo Agostinho, Pernambuco, Brazil", "remoto": False},
+        {"cargo": "Desenvolvedor Python", "local": "Brazil", "remoto": True},
+        {"cargo": "Desenvolvedor Júnior", "local": "Brazil", "remoto": True}
+    ]
+    for b in buscas_linkedin:
         todas.extend(raspar_linkedin(b["cargo"], b["local"], b["remoto"]))
-        
+
+    # 2. Buscas na Gupy
+    termos_gupy = ["Suporte TI", "Analista TI", "Técnico de Informática", "Desenvolvedor", "Python"]
+    for termo in termos_gupy:
+        todas.extend(raspar_gupy(termo))
+
+    # Recupera enviadas anteriores
     enviadas_prev = {}
     if os.path.exists(ARQUIVO_CSV):
         try:
@@ -104,18 +162,19 @@ def atualizar_banco():
             enviadas_prev = df_old.set_index("link")["enviada"].to_dict()
         except Exception:
             pass
-            
+
+    # Deduplicação
     vistas = set()
     processadas = []
     id_n = 1
-    
+
     for v in todas:
         chave = f"{v['titulo'].lower()}_{v['empresa'].lower()}"
         if chave in vistas or v["link"] in vistas:
             continue
         vistas.add(chave)
         vistas.add(v["link"])
-        
+
         aderencia, tags = extrair_tags_e_aderencia(v["titulo"], v["titulo"])
         processadas.append({
             "id": id_n,
@@ -131,10 +190,10 @@ def atualizar_banco():
             "enviada": bool(enviadas_prev.get(v["link"], False))
         })
         id_n += 1
-        
+
     df_novo = pd.DataFrame(processadas)
     df_novo.to_csv(ARQUIVO_CSV, index=False, encoding="utf-8")
-    print(f"✅ Atualizado com {len(df_novo)} vagas.")
+    print(f"✅ Banco consolidado com {len(df_novo)} vagas ativas (LinkedIn + Gupy).")
 
 if __name__ == "__main__":
     atualizar_banco()
