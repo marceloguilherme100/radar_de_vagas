@@ -4,79 +4,125 @@ html, body, [class*="css"] {
     font-family: 'Inter', sans-serif;
 }
 
-/* Background suave */
+/* Fundo global escuro */
 .stApp {
-    background-color: #0f172a;
-    color: #f8fafc;
+    background-color: #0b1120 !important;
+    color: #f8fafc !important;
 }
 
-/* Sidebar elegante */
+/* Barra lateral: garante contraste perfeito no título e fundo */
 [data-testid="stSidebar"] {
-    background-color: #1e293b !important;
-    border-right: 1px solid #334155;
+    background-color: #111827 !important;
+    border-right: 1px solid #1f2937 !important;
 }
 
-/* Estilização dos Cards de Botão do Topo */
+[data-testid="stSidebar"] h1, 
+[data-testid="stSidebar"] h2, 
+[data-testid="stSidebar"] h3,
+[data-testid="stSidebar"] p,
+[data-testid="stSidebar"] span {
+    color: #f3f4f6 !important;
+}
+
+/* BOTÕES DOS CARDS DO TOPO (Garante fundo escuro e texto 100% branco e visível) */
 div[data-testid="column"] button {
-    background: #1e293b !important;
+    background-color: #1e293b !important;
     border: 1px solid #334155 !important;
     border-radius: 12px !important;
-    padding: 16px 8px !important;
-    min-height: 85px !important;
+    padding: 12px 6px !important;
+    min-height: 70px !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3) !important;
     transition: all 0.2s ease-in-out !important;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
 }
 
+/* Força todas as tags de texto dentro do botão a ficarem bem brancas e legíveis */
+div[data-testid="column"] button * {
+    color: #ffffff !important;
+    font-size: 0.92rem !important;
+    font-weight: 700 !important;
+    opacity: 1 !important;
+}
+
+/* Efeito ao passar o mouse */
 div[data-testid="column"] button:hover {
-    border-color: #38bdf8 !important;
-    transform: translateY(-3px) !important;
-    box-shadow: 0 10px 15px -3px rgba(56, 189, 248, 0.2);
+    background-color: #2563eb !important;
+    border-color: #60a5fa !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 16px -2px rgba(37, 99, 235, 0.4) !important;
 }
 
-div[data-testid="column"] button p {
-    color: #f8fafc !important;
-    font-size: 0.95rem !important;
+/* Botão de Expirada (garante texto e ícone legíveis) */
+button[key^="del_"] {
+    background-color: #1e293b !important;
+    border: 1px solid #475569 !important;
+}
+
+button[key^="del_"] * {
+    color: #f87171 !important;
     font-weight: 600 !important;
 }
 
-/* Container do Card de Vaga */
+/* Card Principal da Vaga */
 .job-card {
-    background: #1e293b;
-    border: 1px solid #334155;
-    border-radius: 16px;
-    padding: 24px;
-    margin-bottom: 20px;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
-    transition: border-color 0.2s ease;
+    background-color: #131d31;
+    border: 1px solid #1e293b;
+    border-radius: 14px;
+    padding: 22px;
+    margin-top: 10px;
+    margin-bottom: 8px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
 }
 
-.job-card:hover {
-    border-color: #475569;
-}
-
-/* Título da Vaga */
 .job-title {
     font-size: 1.25rem;
     font-weight: 700;
-    color: #f8fafc;
-    margin-bottom: 8px;
+    color: #ffffff;
+    margin-bottom: 6px;
 }
 
-/* Badges / Pílulas */
+/* Badges estilizadas */
 .badge {
     display: inline-block;
     padding: 4px 10px;
     border-radius: 9999px;
-    font-size: 0.75rem;
+    font-size: 0.76rem;
     font-weight: 600;
     margin-right: 6px;
-    margin-bottom: 6px;
+    margin-top: 6px;
 }
 
-.badge-linkedin { background-color: rgba(10, 102, 194, 0.2); color: #38bdf8; border: 1px solid rgba(10, 102, 194, 0.4); }
-.badge-gupy { background-color: rgba(0, 227, 150, 0.15); color: #4ade80; border: 1px solid rgba(0, 227, 150, 0.3); }
-.badge-infojobs { background-color: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+.badge-linkedin { 
+    background-color: rgba(14, 116, 144, 0.3) !important; 
+    color: #38bdf8 !important; 
+    border: 1px solid rgba(56, 189, 248, 0.4) !important; 
+}
 
-.badge-area { background-color: #334155; color: #cbd5e1; }
-.badge-modalidade { background-color: rgba(147, 51, 234, 0.2); color: #c084fc; border: 1px solid rgba(147, 51, 234, 0.4); }
-.badge-empresa { color: #94a3b8; font-weight: 500; font-size: 0.9rem; }
+.badge-gupy { 
+    background-color: rgba(22, 101, 52, 0.3) !important; 
+    color: #4ade80 !important; 
+    border: 1px solid rgba(74, 222, 128, 0.4) !important; 
+}
+
+.badge-infojobs { 
+    background-color: rgba(180, 83, 9, 0.3) !important; 
+    color: #fbbf24 !important; 
+    border: 1px solid rgba(251, 191, 36, 0.4) !important; 
+}
+
+.badge-area { 
+    background-color: #1e293b !important; 
+    color: #cbd5e1 !important; 
+    border: 1px solid #334155 !important;
+}
+
+.badge-modalidade { 
+    background-color: rgba(107, 33, 168, 0.3) !important; 
+    color: #c084fc !important; 
+    border: 1px solid rgba(192, 132, 252, 0.4) !important; 
+}
+
+.badge-empresa { 
+    color: #93c5fd !important; 
+    font-weight: 600 !important; 
+    font-size: 0.95rem !important; 
+}
