@@ -24,33 +24,38 @@ html, body, [class*="css"] {
     color: #f3f4f6 !important;
 }
 
-/* BOTÕES DOS CARDS DO TOPO (Garante fundo escuro e texto 100% branco e visível) */
-div[data-testid="column"] button {
+/* FORÇA O FUNDO ESCURO NOS BOTÕES DAS COLUNAS */
+div[data-testid="column"] button,
+div[data-testid="column"] .stButton > button,
+div[data-testid="stHorizontalBlock"] button {
+    background: #1e293b !important;
     background-color: #1e293b !important;
-    border: 1px solid #334155 !important;
+    border: 1px solid #475569 !important;
     border-radius: 12px !important;
-    padding: 12px 6px !important;
     min-height: 70px !important;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3) !important;
-    transition: all 0.2s ease-in-out !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4) !important;
 }
 
-/* Força todas as tags de texto dentro do botão a ficarem bem brancas e legíveis */
-div[data-testid="column"] button * {
+/* FORÇA O TEXTO A FICAR BRANCO E NÍTIDO */
+div[data-testid="column"] button *,
+div[data-testid="column"] .stButton > button *,
+div[data-testid="stHorizontalBlock"] button * {
     color: #ffffff !important;
-    font-size: 0.92rem !important;
+    -webkit-text-fill-color: #ffffff !important;
     font-weight: 700 !important;
+    font-size: 0.95rem !important;
     opacity: 1 !important;
+    visibility: visible !important;
 }
 
-/* Efeito ao passar o mouse */
-div[data-testid="column"] button:hover {
+/* ESTILO AO PASSAR O MOUSE */
+div[data-testid="column"] button:hover,
+div[data-testid="column"] .stButton > button:hover,
+div[data-testid="stHorizontalBlock"] button:hover {
     background-color: #2563eb !important;
     border-color: #60a5fa !important;
     transform: translateY(-2px) !important;
-    box-shadow: 0 8px 16px -2px rgba(37, 99, 235, 0.4) !important;
 }
-
 
 /* Botão de Expirada (garante texto e ícone legíveis) */
 button[key^="del_"] {
