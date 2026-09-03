@@ -172,12 +172,18 @@ def atualizar_banco():
 
     # 1. Buscas no LinkedIn
     buscas_linkedin = [
-        {"cargo": "Suporte TI", "local": "Recife, Pernambuco, Brazil", "remoto": False},
-        {"cargo": "Analista de TI", "local": "Recife, Pernambuco, Brazil", "remoto": False},
-        {"cargo": "Técnico de Informática", "local": "Pernambuco, Brazil", "remoto": False},
-        {"cargo": "Suporte TI", "local": "Cabo de Santo Agostinho, Pernambuco, Brazil", "remoto": False},
-        {"cargo": "Desenvolvedor Python", "local": "Brazil", "remoto": True},
-        {"cargo": "Desenvolvedor Júnior", "local": "Brazil", "remoto": True}
+        {"cargo": "Tecnico de Suporte", "local": "Pernambuco, Brazil", "remoto": False},
+    {"cargo": "Tecnico de Informatica", "local": "Pernambuco, Brazil", "remoto": False},
+    {"cargo": "Suporte TI", "local": "Recife, Pernambuco, Brazil", "remoto": False},
+    {"cargo": "Analista de Suporte", "local": "Recife, Pernambuco, Brazil", "remoto": False},
+    {"cargo": "Suporte Tecnico", "local": "Pernambuco, Brazil", "remoto": False},
+    {"cargo": "Suporte TI", "local": "Cabo de Santo Agostinho, Pernambuco, Brazil", "remoto": False},
+    
+    # Remoto
+    {"cargo": "Tecnico de Suporte Remoto", "local": "Brazil", "remoto": True},
+    {"cargo": "Analista de Suporte Remoto", "local": "Brazil", "remoto": True},
+    {"cargo": "Desenvolvedor Python", "local": "Brazil", "remoto": True},
+    {"cargo": "Desenvolvedor Junior", "local": "Brazil", "remoto": True}
     ]
     for b in buscas_linkedin:
         todas.extend(raspar_linkedin(b["cargo"], b["local"], b["remoto"]))
