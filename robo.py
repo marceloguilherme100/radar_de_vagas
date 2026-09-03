@@ -43,21 +43,22 @@ def limpar_link(url_bruta):
 # FONTE 1: LINKEDIN
 # ==========================================
 def vaga_ainda_ativa(url_vaga):
-    """Verifica se a vaga ainda está aceitando candidaturas."""
+    """Verifica com precisão se a vaga no LinkedIn ainda aceita candidaturas."""
     try:
-        res = requests.get(url_vaga, headers=HEADERS, timeout=5)
+        res = requests.get(url_vaga, headers=HEADERS, timeout=6, allow_redirects=True)
         if res.status_code != 200:
             return False
         
         texto_pagina = res.text.lower()
         
-        # Padrões que indicam vaga encerrada/expirada no LinkedIn
         termos_fechada = [
             "não aceita mais candidaturas",
             "nao aceita mais candidaturas",
             "no longer accepting applications",
             "closed-job",
-            "vaga encerrada"
+            "closed_job",
+            "topcard__flavor--closed",
+            "job-details-jobs-unified-top-card__closed-message"
         ]
         
         if any(termo in texto_pagina for termo in termos_fechada):
@@ -65,7 +66,6 @@ def vaga_ainda_ativa(url_vaga):
             
         return True
     except Exception:
-        # Em caso de falha de timeout, mantém para não descartar indevidamente
         return True
 
 def raspar_linkedin(cargo, localidade, apenas_remoto=False):

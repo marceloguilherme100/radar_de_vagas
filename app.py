@@ -117,13 +117,13 @@ else:
             porc = int(vaga['aderencia'] * 100)
             st.progress(float(vaga['aderencia']), text=f"Aderência: {porc}% ({vaga['tags']})")
             
-            btn_c1, btn_c2, _ = st.columns([1, 1.5, 3])
+            btn_c1, btn_c2, btn_c3 = st.columns([1, 1.3, 1])
             with btn_c1:
                 st.link_button("Ver vaga ↗", vaga["link"])
                 
             with btn_c2:
                 if vaga["enviada"]:
-                    if st.button("↩️ Reativar vaga", key=f"rec_{vaga['id']}"):
+                    if st.button("↩️ Reativar", key=f"rec_{vaga['id']}"):
                         df.loc[df["id"] == vaga["id"], "enviada"] = False
                         df.to_csv(ARQUIVO_CSV, index=False, encoding="utf-8")
                         st.rerun()
@@ -132,5 +132,12 @@ else:
                         df.loc[df["id"] == vaga["id"], "enviada"] = True
                         df.to_csv(ARQUIVO_CSV, index=False, encoding="utf-8")
                         st.rerun()
+
+            with btn_c3:
+                # Botão para apagar vaga expirada da lista definitivamente
+                if st.button("🗑️ Expirada", key=f"del_{vaga['id']}"):
+                    df = df[df["id"] != vaga["id"]]
+                    df.to_csv(ARQUIVO_CSV, index=False, encoding="utf-8")
+                    st.rerun()
 
         st.markdown("---")
