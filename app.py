@@ -1,13 +1,11 @@
 import streamlit as st
 import pandas as pd
 import os
-from streamlit_local_storage import LocalStorage
 from robo import atualizar_banco
 
 st.set_page_config(page_title="Radar de Vagas", page_icon="🎯", layout="wide")
 
-# Inicializa o armazenamento local do navegador
-local_storage = LocalStorage()
+ARQUIVO_CSV = "vagas.csv"
 
 def carregar_css(caminho_css):
     if os.path.exists(caminho_css):
@@ -16,13 +14,23 @@ def carregar_css(caminho_css):
 
 carregar_css("style.css")
 
-# Recupera os dados salvos no navegador (ou cria conjuntos vazios)
-enviadas_storage = local_storage.getItem("vagas_enviadas") or []
-expiradas_storage = local_storage.getItem("vagas_expiradas") or []
+# Carrega e higieniza a base
+if not os.path.exists(ARQUIVO_CSV):
+    st.info("Banco de dados vazio. Clique em 'Atualizar Vagas Agora' na barra lateral.")
+    st.stop()
 
-# Converte em sets para busca rápida
-set_enviadas = set(enviadas_storage)
-set_expiradas = set(expiradas_storage)
+df = pd.read_csv(ARQUIVO_CSV)
+
+# Garante a existência das colunas de controle
+if "enviada" not in df.columns:
+    df["enviada"] = False
+else:
+    df["enviada"] = df["enviada"].fillna(False).astype(bool)
+
+if "area" not in df.columns:
+    df["area"] = df["titulo"].apply(
+        lambda t: "Desenvolvimento" if any(k in str(t).lower() for k in ["dev", "programador", "software", "python", "frontend", "backend", "fullstack"]) else "Suporte / TI"
+    )
 
 if "pagina_atual" not in st.session_state:
     st.session_state.pagina_atual = "Todas"
@@ -30,26 +38,7 @@ if "pagina_atual" not in st.session_state:
 def mudar_pagina(nome_pagina):
     st.session_state.pagina_atual = nome_pagina
 
-ARQUIVO_CSV = "vagas.csv"
-
-if os.path.exists(ARQUIVO_CSV):
-    df = pd.read_csv(ARQUIVO_CSV)
-    if "area" not in df.columns:
-        df["area"] = df["titulo"].apply(
-            lambda t: "Desenvolvimento" if any(k in str(t).lower() for k in ["dev", "programador", "software", "python", "frontend", "backend", "fullstack"]) else "Suporte / TI"
-        )
-else:
-    st.info("Banco de dados vazio. Clique em 'Atualizar Vagas Agora' na barra lateral.")
-    st.stop()
-
-# Aplica os filtros persistentes do LocalStorage
-# 1. Remove vagas marcadas como expiradas/excluídas
-df = df[~df["link"].isin(set_expiradas)].copy()
-
-# 2. Marca status de enviada com base no navegador
-df["enviada"] = df["link"].apply(lambda link: link in set_enviadas)
-
-# Barra lateral
+# Barra Lateral
 with st.sidebar:
     st.header("⚙️ Ações")
     if st.button("🔄 Atualizar Vagas Agora", type="primary", use_container_width=True):
@@ -58,13 +47,7 @@ with st.sidebar:
         st.success("Vagas atualizadas!")
         st.rerun()
 
-    st.divider()
-    if st.button("🧹 Limpar Histórico do Navegador"):
-        local_storage.deleteItem("vagas_enviadas")
-        local_storage.deleteItem("vagas_expiradas")
-        st.rerun()
-
-# Contadores para os Cards
+# Contadores
 ativas_df = df[df["enviada"] == False]
 total_ativas = len(ativas_df)
 suporte_cnt = len(ativas_df[ativas_df["area"] == "Suporte / TI"])
@@ -73,12 +56,12 @@ remoto_cnt = len(ativas_df[ativas_df["modalidade"] == "Remoto"])
 industria_cnt = len(ativas_df[ativas_df["tipo"] == "Indústria"])
 enviadas_cnt = len(df[df["enviada"] == True])
 
-st.title("🎯 Radar de Vagas - Marcelo")
-st.markdown("**Monitoramento Estratégico:** Suporte / Redes / Infra (RMR e Polo) & Dev / Programação (Remoto e Local)")
+st.title("🎯 Radar de Vagas")
+st.markdown("**Painel de Oportunidades:** Suporte / TI & Desenvolvimento")
 st.divider()
 
 # Cards Clicáveis
-st.subheader("Categorias de Oportunidades")
+st.subheader("Categorias")
 c1, c2, c3, c4, c5, c6 = st.columns(6)
 
 with c1:
@@ -102,24 +85,23 @@ with c6:
 
 st.divider()
 
-# Filtragem de visualização
+# Exibição conforme o filtro selecionado
 if st.session_state.pagina_atual == "Enviadas":
     st.subheader(f"📤 Histórico de Candidaturas Realizadas ({enviadas_cnt})")
     df_exibicao = df[df["enviada"] == True].copy()
 else:
     df_exibicao = df[df["enviada"] == False].copy()
-    
     if st.session_state.pagina_atual == "Suporte":
-        st.subheader(f"🛠️ Vagas de Suporte, Helpdesk, Redes e Técnico ({suporte_cnt})")
+        st.subheader(f"🛠️ Suporte, Helpdesk e Redes ({suporte_cnt})")
         df_exibicao = df_exibicao[df_exibicao["area"] == "Suporte / TI"]
     elif st.session_state.pagina_atual == "Dev":
-        st.subheader(f"💻 Vagas de Programação, Dev e Software ({dev_cnt})")
+        st.subheader(f"💻 Programação e Software ({dev_cnt})")
         df_exibicao = df_exibicao[df_exibicao["area"] == "Desenvolvimento"]
     elif st.session_state.pagina_atual == "Remoto":
-        st.subheader(f"🏠 Vagas Remotas Brasil ({remoto_cnt})")
+        st.subheader(f"🏠 Vagas Remotas ({remoto_cnt})")
         df_exibicao = df_exibicao[df_exibicao["modalidade"] == "Remoto"]
     elif st.session_state.pagina_atual == "Indústria":
-        st.subheader(f"🏭 Vagas Indústria / Suape / Cabo ({industria_cnt})")
+        st.subheader(f"🏭 Polo Industrial / Suape / Cabo ({industria_cnt})")
         df_exibicao = df_exibicao[df_exibicao["tipo"] == "Indústria"]
     else:
         st.subheader(f"📋 Todas as Vagas Disponíveis ({total_ativas})")
@@ -132,7 +114,7 @@ if st.session_state.pagina_atual != "Todas":
 df_exibicao = df_exibicao.sort_values(by="aderencia", ascending=False)
 
 if df_exibicao.empty:
-    st.info("Nenhuma vaga encontrada nesta visualização.")
+    st.info("Nenhuma vaga encontrada nesta categoria.")
 else:
     for _, vaga in df_exibicao.iterrows():
         with st.container():
@@ -143,26 +125,24 @@ else:
             porc = int(vaga['aderencia'] * 100)
             st.progress(float(vaga['aderencia']), text=f"Aderência: {porc}% ({vaga['tags']})")
             
-            btn_c1, btn_c2, btn_c3 = st.columns([1, 1.3, 1])
-            with btn_c1:
+            b1, b2, b3 = st.columns([1, 1.3, 1])
+            with b1:
                 st.link_button("Ver vaga ↗", vaga["link"])
-                
-            with btn_c2:
+            with b2:
                 if vaga["enviada"]:
                     if st.button("↩️ Reativar", key=f"rec_{vaga['id']}"):
-                        set_enviadas.discard(vaga["link"])
-                        local_storage.setItem("vagas_enviadas", list(set_enviadas))
+                        df.loc[df["link"] == vaga["link"], "enviada"] = False
+                        df.to_csv(ARQUIVO_CSV, index=False, encoding="utf-8")
                         st.rerun()
                 else:
                     if st.button("Marcar enviada ✔️", key=f"env_{vaga['id']}", type="primary"):
-                        set_enviadas.add(vaga["link"])
-                        local_storage.setItem("vagas_enviadas", list(set_enviadas))
+                        df.loc[df["link"] == vaga["link"], "enviada"] = True
+                        df.to_csv(ARQUIVO_CSV, index=False, encoding="utf-8")
                         st.rerun()
-
-            with btn_c3:
+            with b3:
                 if st.button("🗑️ Expirada", key=f"del_{vaga['id']}"):
-                    set_expiradas.add(vaga["link"])
-                    local_storage.setItem("vagas_expiradas", list(set_expiradas))
+                    df = df[df["link"] != vaga["link"]]
+                    df.to_csv(ARQUIVO_CSV, index=False, encoding="utf-8")
                     st.rerun()
 
         st.markdown("---")
