@@ -1,44 +1,82 @@
-/* ========================================= */
-/* 1. SEUS ESTILOS ANTERIORES                */
-/* (Botões, fontes, cores que já estavam lá) */
-/* ========================================= */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-/* ... (seus estilos já existentes continuam aqui) ... */
-
-
-/* ========================================= */
-/* 2. NOVO BLOCO DOS CARDS CLICÁVEIS         */
-/* ========================================= */
-
-/* Transforma os botões das colunas do topo em Cards */
-div[data-testid="stHorizontalBlock"] button[kind="secondary"] {
-    background-color: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 10px;
-    padding: 16px 8px;
-    height: 100px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-    transition: all 0.2s ease-in-out;
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
 }
 
-/* Efeito ao passar o mouse por cima do Card */
-div[data-testid="stHorizontalBlock"] button[kind="secondary"]:hover {
-    border-color: #3b82f6;
-    background-color: #f8fafc;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+/* Background suave */
+.stApp {
+    background-color: #0f172a;
+    color: #f8fafc;
 }
 
-/* Título e numeração interna dos cards */
-div[data-testid="stHorizontalBlock"] button p {
-    font-size: 14px;
-    font-weight: 500;
+/* Sidebar elegante */
+[data-testid="stSidebar"] {
+    background-color: #1e293b !important;
+    border-right: 1px solid #334155;
 }
 
-div[data-testid="stHorizontalBlock"] button h3 {
-    margin: 0;
-    padding: 0;
-    font-size: 26px;
+/* Estilização dos Cards de Botão do Topo */
+div[data-testid="column"] button {
+    background: #1e293b !important;
+    border: 1px solid #334155 !important;
+    border-radius: 12px !important;
+    padding: 16px 8px !important;
+    min-height: 85px !important;
+    transition: all 0.2s ease-in-out !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+}
+
+div[data-testid="column"] button:hover {
+    border-color: #38bdf8 !important;
+    transform: translateY(-3px) !important;
+    box-shadow: 0 10px 15px -3px rgba(56, 189, 248, 0.2);
+}
+
+div[data-testid="column"] button p {
+    color: #f8fafc !important;
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
+}
+
+/* Container do Card de Vaga */
+.job-card {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+    transition: border-color 0.2s ease;
+}
+
+.job-card:hover {
+    border-color: #475569;
+}
+
+/* Título da Vaga */
+.job-title {
+    font-size: 1.25rem;
     font-weight: 700;
-    color: #0f172a;
+    color: #f8fafc;
+    margin-bottom: 8px;
 }
+
+/* Badges / Pílulas */
+.badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-right: 6px;
+    margin-bottom: 6px;
+}
+
+.badge-linkedin { background-color: rgba(10, 102, 194, 0.2); color: #38bdf8; border: 1px solid rgba(10, 102, 194, 0.4); }
+.badge-gupy { background-color: rgba(0, 227, 150, 0.15); color: #4ade80; border: 1px solid rgba(0, 227, 150, 0.3); }
+.badge-infojobs { background-color: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+
+.badge-area { background-color: #334155; color: #cbd5e1; }
+.badge-modalidade { background-color: rgba(147, 51, 234, 0.2); color: #c084fc; border: 1px solid rgba(147, 51, 234, 0.4); }
+.badge-empresa { color: #94a3b8; font-weight: 500; font-size: 0.9rem; }
