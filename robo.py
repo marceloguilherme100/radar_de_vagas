@@ -117,6 +117,72 @@ def raspar_linkedin(cargo, localidade, apenas_remoto=False):
         print(f"Erro LinkedIn ({cargo}): {e}")
     return vagas
 
+
+# ==========================================
+# FONTE: INFOJOBS
+# ==========================================
+def raspar_infojobs(termo_busca, uf="pe"):
+    """
+    Raspa anúncios de vagas públicas do InfoJobs por cargo e estado.
+    Exemplo: termo_busca='suporte-ti', uf='pe'
+    """
+    vagas = []
+    headers_infojobs = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Referer": "https://www.infojobs.com.br/"
+    }
+    
+    # Formata termo de busca para a URL do InfoJobs (ex: "suporte ti" -> "suporte-ti")
+    slug_termo = termo_busca.lower().strip().replace(" ", "-")
+    url = f"https://www.infojobs.com.br/vagas-de-emprego-{slug_termo}-em-{uf}.aspx"
+    
+    try:
+        res = requests.get(url, headers=headers_infojobs, timeout=12)
+        if res.status_code != 200:
+            return vagas
+            
+        soup = BeautifulSoup(res.text, "html.parser")
+        
+        # O InfoJobs encapsula as vagas em elementos com atributo data-js="vacancy-item" ou tags <div> com js-vacancy-item
+        cards = soup.find_all("div", class_=lambda c: c and "js_vacancy" in c) or soup.find_all("div", attrs={"data-js": "vacancy-item"})
+        
+        for card in cards:
+            tit_elem = card.find("h2") or card.find("a", class_=lambda c: c and "title" in c)
+            emp_elem = card.find("div", class_=lambda c: c and "company" in c) or card.find("a", class_=lambda c: c and "company" in c)
+            loc_elem = card.find("div", class_=lambda c: c and "location" in c) or card.find("span", class_=lambda c: c and "location" in c)
+            
+            lnk_elem = card.find("a", href=True)
+            
+            if tit_elem and lnk_elem:
+                titulo = tit_elem.get_text(strip=True)
+                empresa = emp_elem.get_text(strip=True) if emp_elem else "Empresa Confidencial"
+                local = loc_elem.get_text(strip=True) if loc_elem else "Pernambuco"
+                
+                link_relativo = lnk_elem["href"]
+                link_completo = link_relativo if link_relativo.startswith("http") else f"https://www.infojobs.com.br{link_relativo}"
+                
+                # Descarte de rastreamento do link
+                link_limpo = limpar_link(link_completo)
+                
+                is_remoto = any(k in f"{local} {titulo}".lower() for k in ["remoto", "home office", "teletrabalho"])
+                tipo = "Indústria" if any(k in f"{local} {empresa}".lower() for k in ["suape", "cabo", "ipojuca", "porto", "indústria"]) else "Geral"
+                
+                vagas.append({
+                    "titulo": titulo,
+                    "empresa": empresa,
+                    "local": local if not is_remoto else "Remoto (Brasil)",
+                    "tipo": tipo,
+                    "modalidade": "Remoto" if is_remoto else "Presencial",
+                    "area": classificar_area(titulo),
+                    "link": link_limpo
+                })
+    except Exception as e:
+        print(f"Erro ao raspar InfoJobs ({termo_busca}): {e}")
+        
+    return vagas
+
+
 # ==========================================
 # FONTE 2: GUPY (API Pública da Gupy)
 # ==========================================
@@ -192,6 +258,18 @@ def atualizar_banco():
     termos_gupy = ["Suporte TI", "Analista TI", "Técnico de Informática", "Desenvolvedor", "Python"]
     for termo in termos_gupy:
         todas.extend(raspar_gupy(termo))
+
+    # Buscas no InfoJobs (foco em Pernambuco e termos estratégicos)
+    termos_infojobs = [
+        "suporte ti",
+        "tecnico informatica",
+        "analista suporte",
+        "analista ti",
+        "desenvolvedor"
+    ]
+    for termo in termos_infojobs:
+        todas.extend(raspar_infojobs(termo, uf="pe"))
+
 
     # Recupera enviadas anteriores
     enviadas_prev = {}
