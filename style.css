@@ -4,6 +4,18 @@ html, body, [class*="css"] {
     font-family: 'Inter', sans-serif;
 }
 
+
+/* Torna o cabeçalho superior escuro e remove a faixa branca */
+header[data-testid="stHeader"] {
+    background-color: #0b1120 !important;
+}
+
+/* Garante que os ícones nativos (menu, deploy) fiquem claros */
+header[data-testid="stHeader"] * {
+    color: #f8fafc !important;
+}
+
+
 /* Fundo global escuro */
 .stApp {
     background-color: #0b1120 !important;
