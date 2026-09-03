@@ -51,6 +51,7 @@ div[data-testid="column"] button:hover {
     box-shadow: 0 8px 16px -2px rgba(37, 99, 235, 0.4) !important;
 }
 
+
 /* Botão de Expirada (garante texto e ícone legíveis) */
 button[key^="del_"] {
     background-color: #1e293b !important;
