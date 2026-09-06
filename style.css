@@ -158,3 +158,33 @@ button[key^="del_"] * {
     padding-right: 2rem !important;
     padding-top: 1rem !important;
 }
+
+/* UNIFORMIZA ALTURA E FORMATO DE TODOS OS BOTÕES DOS CARDS */
+div[data-testid="stHorizontalBlock"] .stButton > button,
+div[data-testid="stHorizontalBlock"] a[data-testid="stLinkButton"] {
+    min-height: 48px !important;
+    height: 48px !important;
+    max-height: 48px !important;
+    border-radius: 10px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 0.95rem !important;
+    font-weight: 600 !important;
+    box-sizing: border-box !important;
+    padding: 0 16px !important;
+}
+
+/* Garante que o botão 'Acessar vaga' (link) não fique branco e destoe */
+div[data-testid="stHorizontalBlock"] a[data-testid="stLinkButton"] {
+    background-color: #1e293b !important;
+    color: #ffffff !important;
+    border: 1px solid #475569 !important;
+    text-decoration: none !important;
+}
+
+div[data-testid="stHorizontalBlock"] a[data-testid="stLinkButton"]:hover {
+    background-color: #334155 !important;
+    border-color: #94a3b8 !important;
+    color: #ffffff !important;
+}

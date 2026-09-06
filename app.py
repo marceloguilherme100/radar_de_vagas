@@ -163,7 +163,8 @@ else:
         porc = int(vaga['aderencia'] * 100)
         st.progress(float(vaga['aderencia']), text=f"Match com perfil: {porc}% • Tags: {vaga['tags']}")
 
-        btn_c1, btn_c2, btn_c3 = st.columns([1, 1.4, 0.8])
+        # Alinha as 3 colunas com tamanhos perfeitamente iguais
+        btn_c1, btn_c2, btn_c3 = st.columns([1, 1, 1])
         with btn_c1:
             st.link_button("Acessar vaga ↗", vaga["link"], use_container_width=True)
         with btn_c2:
