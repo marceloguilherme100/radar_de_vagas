@@ -66,8 +66,8 @@ remoto_cnt = len(ativas_df[ativas_df["modalidade"] == "Remoto"])
 industria_cnt = len(ativas_df[ativas_df["tipo"] == "Indústria"])
 enviadas_cnt = len(df[df["enviada"] == True])
 
-# Cabeçalho Principal com Botão de Ação integrado ao lado do título
-col_titulo, col_btn = st.columns([4, 1])
+# Cabeçalho Principal com Botão integrado
+col_titulo, col_btn = st.columns([4, 1.2])
 
 with col_titulo:
     st.markdown("<h1 style='margin-top: 0; margin-bottom: 0;'>🎯 Radar de Oportunidades</h1>", unsafe_allow_html=True)
@@ -105,4 +105,82 @@ with c6:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# Listagem de Vagas (continua o restante do código normalmente...)
+# Filtragem de visualização
+if st.session_state.pagina_atual == "Enviadas":
+    st.subheader(f"📤 Candidaturas Realizadas ({enviadas_cnt})")
+    df_exibicao = df[df["enviada"] == True].copy()
+else:
+    df_exibicao = df[df["enviada"] == False].copy()
+    if st.session_state.pagina_atual == "Suporte":
+        st.subheader(f"🛠️ Vagas de Suporte e Infra ({suporte_cnt})")
+        df_exibicao = df_exibicao[df_exibicao["area"] == "Suporte / TI"]
+    elif st.session_state.pagina_atual == "Dev":
+        st.subheader(f"💻 Vagas de Programação e Software ({dev_cnt})")
+        df_exibicao = df_exibicao[df_exibicao["area"] == "Desenvolvimento"]
+    elif st.session_state.pagina_atual == "Remoto":
+        st.subheader(f"🏠 Oportunidades Remotas ({remoto_cnt})")
+        df_exibicao = df_exibicao[df_exibicao["modalidade"] == "Remoto"]
+    elif st.session_state.pagina_atual == "Indústria":
+        st.subheader(f"🏭 Vagas em Polo Industrial / Suape / Cabo ({industria_cnt})")
+        df_exibicao = df_exibicao[df_exibicao["tipo"] == "Indústria"]
+    else:
+        st.subheader(f"📋 Todas as Vagas Disponíveis ({total_ativas})")
+
+if st.session_state.pagina_atual != "Todas":
+    if st.button("⬅️ Ver Todas as Vagas Disponíveis"):
+        st.session_state.pagina_atual = "Todas"
+        st.rerun()
+
+df_exibicao = df_exibicao.sort_values(by="aderencia", ascending=False)
+
+if df_exibicao.empty:
+    st.info("Nenhuma vaga cadastrada nesta categoria no momento.")
+else:
+    for _, vaga in df_exibicao.iterrows():
+        fonte = vaga["fonte"]
+        classe_fonte = "badge-linkedin" if fonte == "LinkedIn" else ("badge-gupy" if fonte == "Gupy" else "badge-infojobs")
+        icone_cargo = "💻" if vaga.get("area") == "Desenvolvimento" else "🛠️"
+        
+        st.markdown(f"""
+        <div class="job-card">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div>
+                    <div class="job-title">{icone_cargo} {vaga['titulo']}</div>
+                    <div style="margin-bottom: 12px;">
+                        <span class="badge-empresa">🏢 {vaga['empresa']}</span> &nbsp;•&nbsp; 
+                        <span style="color:#94a3b8; font-size:0.9rem;">📍 {vaga['local']}</span>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <span class="badge {classe_fonte}">🌐 {fonte}</span>
+                <span class="badge badge-area">🏷️ {vaga['area']}</span>
+                <span class="badge badge-modalidade">🏠 {vaga['modalidade']}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        porc = int(vaga['aderencia'] * 100)
+        st.progress(float(vaga['aderencia']), text=f"Match com perfil: {porc}% • Tags: {vaga['tags']}")
+
+        btn_c1, btn_c2, btn_c3 = st.columns([1, 1.4, 0.8])
+        with btn_c1:
+            st.link_button("Acessar vaga ↗", vaga["link"], use_container_width=True)
+        with btn_c2:
+            if vaga["enviada"]:
+                if st.button("↩️ Reativar vaga", key=f"rec_{vaga['id']}", use_container_width=True):
+                    df.loc[df["link"] == vaga["link"], "enviada"] = False
+                    df.to_csv(ARQUIVO_CSV, index=False, encoding="utf-8")
+                    st.rerun()
+            else:
+                if st.button("Marcar enviada ✔️", key=f"env_{vaga['id']}", type="primary", use_container_width=True):
+                    df.loc[df["link"] == vaga["link"], "enviada"] = True
+                    df.to_csv(ARQUIVO_CSV, index=False, encoding="utf-8")
+                    st.rerun()
+        with btn_c3:
+            if st.button("🗑️ Expirada", key=f"del_{vaga['id']}", use_container_width=True):
+                df = df[df["link"] != vaga["link"]]
+                df.to_csv(ARQUIVO_CSV, index=False, encoding="utf-8")
+                st.rerun()
+
+        st.markdown("<br>", unsafe_allow_html=True)
