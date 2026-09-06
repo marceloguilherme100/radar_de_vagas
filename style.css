@@ -159,12 +159,23 @@ button[key^="del_"] * {
     padding-top: 1rem !important;
 }
 
-/* UNIFORMIZA ALTURA E FORMATO DE TODOS OS BOTÕES DOS CARDS */
+/* FORÇA ALTURA, LARGURA E FORMATO IDÊNTICOS PARA TODOS OS 3 ELEMENTOS */
+div[data-testid="stHorizontalBlock"] .stButton,
+div[data-testid="stHorizontalBlock"] .stLinkButton,
+div[data-testid="stHorizontalBlock"] div[data-testid="stLinkButton"] {
+    width: 100% !important;
+    display: flex !important;
+    align-items: stretch !important;
+}
+
 div[data-testid="stHorizontalBlock"] .stButton > button,
-div[data-testid="stHorizontalBlock"] a[data-testid="stLinkButton"] {
-    min-height: 48px !important;
+div[data-testid="stHorizontalBlock"] .stLinkButton > a,
+div[data-testid="stHorizontalBlock"] a[data-testid="stLinkButton"],
+div[data-testid="stHorizontalBlock"] a[role="button"] {
     height: 48px !important;
+    min-height: 48px !important;
     max-height: 48px !important;
+    width: 100% !important;
     border-radius: 10px !important;
     display: flex !important;
     align-items: center !important;
@@ -172,19 +183,31 @@ div[data-testid="stHorizontalBlock"] a[data-testid="stLinkButton"] {
     font-size: 0.95rem !important;
     font-weight: 600 !important;
     box-sizing: border-box !important;
-    padding: 0 16px !important;
+    margin: 0 !important;
+    padding: 0 12px !important;
+    line-height: 1 !important;
 }
 
-/* Garante que o botão 'Acessar vaga' (link) não fique branco e destoe */
-div[data-testid="stHorizontalBlock"] a[data-testid="stLinkButton"] {
+/* Garante estilo escuro uniforme no botão de link 'Acessar vaga' */
+div[data-testid="stHorizontalBlock"] .stLinkButton > a,
+div[data-testid="stHorizontalBlock"] a[data-testid="stLinkButton"],
+div[data-testid="stHorizontalBlock"] a[role="button"] {
     background-color: #1e293b !important;
     color: #ffffff !important;
     border: 1px solid #475569 !important;
     text-decoration: none !important;
 }
 
-div[data-testid="stHorizontalBlock"] a[data-testid="stLinkButton"]:hover {
+div[data-testid="stHorizontalBlock"] .stLinkButton > a *,
+div[data-testid="stHorizontalBlock"] a[data-testid="stLinkButton"] *,
+div[data-testid="stHorizontalBlock"] a[role="button"] * {
+    color: #ffffff !important;
+    -webkit-text-fill-color: #ffffff !important;
+}
+
+div[data-testid="stHorizontalBlock"] .stLinkButton > a:hover,
+div[data-testid="stHorizontalBlock"] a[data-testid="stLinkButton"]:hover,
+div[data-testid="stHorizontalBlock"] a[role="button"]:hover {
     background-color: #334155 !important;
     border-color: #94a3b8 !important;
-    color: #ffffff !important;
 }
