@@ -20,7 +20,7 @@ def carregar_css(caminho_css):
 carregar_css("style.css")
 
 if not os.path.exists(ARQUIVO_CSV):
-    st.info("Banco de dados vazio. Clique no botão abaixo para buscar as vagas.")
+    st.info("Banco de dados vazio. Clique no botão abaixo para buscar as primeiras vagas.")
     if st.button("🔄 Buscar Vagas Agora", type="primary"):
         with st.spinner("Varrendo LinkedIn, Gupy e InfoJobs..."):
             atualizar_banco()
@@ -29,16 +29,33 @@ if not os.path.exists(ARQUIVO_CSV):
 
 df = pd.read_csv(ARQUIVO_CSV)
 
+# Garante a existência da coluna 'area'
+if "area" not in df.columns:
+    df["area"] = df["titulo"].apply(
+        lambda t: "Desenvolvimento" if any(k in str(t).lower() for k in ["dev", "programador", "software", "python", "frontend", "backend", "fullstack"]) else "Suporte / TI"
+    )
+
+# Garante a existência da coluna 'enviada'
 if "enviada" not in df.columns:
     df["enviada"] = False
 else:
     df["enviada"] = df["enviada"].fillna(False).astype(bool)
 
+# Garante a existência da coluna 'tipo'
 if "tipo" not in df.columns:
     df["tipo"] = "Metropolitana / Recife"
 
+# Garante a existência da coluna 'modalidade'
 if "modalidade" not in df.columns:
-    df["modalidade"] = "Presencial"
+    df["modalidade"] = df["local"].apply(
+        lambda l: "Remoto" if any(k in str(l).lower() for k in ["remoto", "remote", "home office"]) else "Presencial"
+    )
+
+# Garante a existência da coluna 'tags' e 'aderencia'
+if "tags" not in df.columns:
+    df["tags"] = "TI Geral"
+if "aderencia" not in df.columns:
+    df["aderencia"] = 0.70
 
 def identificar_fonte(vaga):
     if "fonte" in vaga and pd.notna(vaga["fonte"]):
@@ -58,7 +75,7 @@ if "pagina_atual" not in st.session_state:
 def mudar_pagina(nome_pagina):
     st.session_state.pagina_atual = nome_pagina
 
-# SEPARAÇÃO ESTRITA DOS DATASETS
+# Separação Estrita dos Datasets
 ativas_df = df[df["enviada"] == False].copy()
 
 # 1. Apenas Remotas
