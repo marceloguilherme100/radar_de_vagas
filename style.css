@@ -144,3 +144,17 @@ button[key^="del_"] * {
     font-weight: 600 !important; 
     font-size: 0.95rem !important; 
 }
+
+/* Remove a barra lateral e os botões de expandir/recolher */
+[data-testid="stSidebar"],
+[data-testid="collapsedControl"] {
+    display: none !important;
+}
+
+/* Garante que o conteúdo ocupe a largura toda sem margem lateral residual */
+.main .block-container {
+    max-width: 100% !important;
+    padding-left: 2rem !important;
+    padding-right: 2rem !important;
+    padding-top: 1rem !important;
+}
