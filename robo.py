@@ -18,8 +18,15 @@ SKILLS_REGEX = {
     "Automação / RPA": r"\bautoma[cç][aã]o\b|\brpa\b"
 }
 
+POLO_KEYWORDS = [
+    "suape", "cabo de santo agostinho", "cabo", "ipojuca", 
+    "porto de suape", "complexo de suape", "complexo industrial", 
+    "indústria", "industria", "estaleiro", "refinaria"
+]
+
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7"
 }
 
 def classificar_area(titulo):
@@ -28,6 +35,17 @@ def classificar_area(titulo):
     if any(k in t for k in dev_keywords):
         return "Desenvolvimento"
     return "Suporte / TI"
+
+def extrair_modalidade_e_tipo(titulo, local, empresa):
+    texto = f"{titulo} {local} {empresa}".lower()
+    
+    is_remoto = any(k in texto for k in ["remoto", "remote", "home office", "teletrabalho"])
+    modalidade = "Remoto" if is_remoto else "Presencial"
+    
+    pertence_polo = any(k in texto for k in POLO_KEYWORDS)
+    tipo = "Polo Industrial" if (pertence_polo and not is_remoto) else ("Remoto" if is_remoto else "Metropolitana / Recife")
+    
+    return modalidade, tipo
 
 def extrair_tags_e_aderencia(titulo, requisitos):
     texto = f"{titulo} {requisitos}".lower()
@@ -39,18 +57,14 @@ def limpar_link(url_bruta):
     parsed = urllib.parse.urlparse(url_bruta)
     return f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
 
-# ==========================================
-# FONTE 1: LINKEDIN
-# ==========================================
 def vaga_ainda_ativa(url_vaga):
-    """Verifica com precisão se a vaga no LinkedIn ainda aceita candidaturas."""
+    """Verifica se a vaga já foi encerrada."""
     try:
         res = requests.get(url_vaga, headers=HEADERS, timeout=6, allow_redirects=True)
         if res.status_code != 200:
             return False
         
         texto_pagina = res.text.lower()
-        
         termos_fechada = [
             "não aceita mais candidaturas",
             "nao aceita mais candidaturas",
@@ -68,13 +82,16 @@ def vaga_ainda_ativa(url_vaga):
     except Exception:
         return True
 
+# ==========================================
+# FONTE 1: LINKEDIN
+# ==========================================
 def raspar_linkedin(cargo, localidade, apenas_remoto=False):
     vagas = []
     q_enc = urllib.parse.quote(cargo)
     loc_enc = urllib.parse.quote(localidade)
     
-    # f_TPR=r604800 filtra apenas anúncios dos últimos 7 dias
-    url = f"https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={q_enc}&location={loc_enc}&f_TPR=r604800&start=0"
+    # f_TPR=r259200 busca vagas dos últimos 3 dias para evitar repetições antigas
+    url = f"https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={q_enc}&location={loc_enc}&f_TPR=r259200&start=0"
     if apenas_remoto:
         url += "&f_WT=2"
         
@@ -100,15 +117,17 @@ def raspar_linkedin(cargo, localidade, apenas_remoto=False):
                 empresa = emp_elem.get_text(strip=True)
                 local = loc_elem.get_text(strip=True) if loc_elem else localidade
                 
-                is_remoto = apenas_remoto or any(k in f"{local} {titulo}".lower() for k in ["remoto", "remote", "home office"])
-                tipo = "Indústria" if any(k in f"{local} {empresa}".lower() for k in ["suape", "cabo", "ipojuca", "porto", "indústria"]) else "Geral"
+                modalidade, tipo = extrair_modalidade_e_tipo(titulo, local, empresa)
+                if apenas_remoto:
+                    modalidade = "Remoto"
+                    tipo = "Remoto"
                 
                 vagas.append({
                     "titulo": titulo,
                     "empresa": empresa,
-                    "local": local if not is_remoto else "Remoto (Brasil)",
+                    "local": "Remoto (Brasil)" if modalidade == "Remoto" else local,
                     "tipo": tipo,
-                    "modalidade": "Remoto" if is_remoto else "Presencial",
+                    "modalidade": modalidade,
                     "area": classificar_area(titulo),
                     "fonte": "LinkedIn",
                     "link": link
@@ -121,21 +140,12 @@ def raspar_linkedin(cargo, localidade, apenas_remoto=False):
 # FONTE 2: INFOJOBS
 # ==========================================
 def raspar_infojobs(termo_busca, uf="pe"):
-    """
-    Raspa anúncios de vagas públicas do InfoJobs por cargo e estado.
-    """
     vagas = []
-    headers_infojobs = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-        "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-        "Referer": "https://www.infojobs.com.br/"
-    }
-    
     slug_termo = termo_busca.lower().strip().replace(" ", "-")
     url = f"https://www.infojobs.com.br/vagas-de-emprego-{slug_termo}-em-{uf}.aspx"
     
     try:
-        res = requests.get(url, headers=headers_infojobs, timeout=12)
+        res = requests.get(url, headers=HEADERS, timeout=12)
         if res.status_code != 200:
             return vagas
             
@@ -153,34 +163,33 @@ def raspar_infojobs(termo_busca, uf="pe"):
                 empresa = emp_elem.get_text(strip=True) if emp_elem else "Empresa Confidencial"
                 local = loc_elem.get_text(strip=True) if loc_elem else "Pernambuco"
                 
-                link_relativo = lnk_elem["href"]
-                link_completo = link_relativo if link_relativo.startswith("http") else f"https://www.infojobs.com.br{link_relativo}"
-                link_limpo = limpar_link(link_completo)
+                link_rel = lnk_elem["href"]
+                link_comp = link_rel if link_rel.startswith("http") else f"https://www.infojobs.com.br{link_rel}"
+                link_limpo = limpar_link(link_comp)
                 
-                is_remoto = any(k in f"{local} {titulo}".lower() for k in ["remoto", "home office", "teletrabalho"])
-                tipo = "Indústria" if any(k in f"{local} {empresa}".lower() for k in ["suape", "cabo", "ipojuca", "porto", "indústria"]) else "Geral"
+                modalidade, tipo = extrair_modalidade_e_tipo(titulo, local, empresa)
                 
                 vagas.append({
                     "titulo": titulo,
                     "empresa": empresa,
-                    "local": local if not is_remoto else "Remoto (Brasil)",
+                    "local": "Remoto (Brasil)" if modalidade == "Remoto" else local,
                     "tipo": tipo,
-                    "modalidade": "Remoto" if is_remoto else "Presencial",
+                    "modalidade": modalidade,
                     "area": classificar_area(titulo),
                     "fonte": "InfoJobs",
                     "link": link_limpo
                 })
     except Exception as e:
-        print(f"Erro ao raspar InfoJobs ({termo_busca}): {e}")
+        print(f"Erro InfoJobs ({termo_busca}): {e}")
         
     return vagas
 
 # ==========================================
-# FONTE 3: GUPY (API Pública da Gupy)
+# FONTE 3: GUPY
 # ==========================================
 def raspar_gupy(termo_busca):
     vagas = []
-    url = f"https://portal.api.gupy.io/api/v1/jobs?jobName={urllib.parse.quote(termo_busca)}&limit=20"
+    url = f"https://portal.api.gupy.io/api/v1/jobs?jobName={urllib.parse.quote(termo_busca)}&limit=25"
     
     try:
         res = requests.get(url, headers=HEADERS, timeout=10)
@@ -198,19 +207,24 @@ def raspar_gupy(termo_busca):
             
             local_str = f"{cidade} - {estado}" if cidade else ("Remoto" if is_remoto else "Brasil")
             local_lower = f"{local_str} {cidade} {estado}".lower()
-            valido_local = any(c in local_lower for c in ["recife", "cabo", "ipojuca", "suape", "pernambuco", "pe", "jaboatão"])
             
-            if not (is_remoto or valido_local):
+            valido_pe = any(c in local_lower for c in ["recife", "cabo", "ipojuca", "suape", "pernambuco", "pe", "jaboatão"])
+            
+            # Descarta se não for remoto nem de Pernambuco
+            if not (is_remoto or valido_pe):
                 continue
-
-            tipo = "Indústria" if any(k in f"{local_str} {empresa}".lower() for k in ["suape", "cabo", "ipojuca", "indústria"]) else "Geral"
+                
+            modalidade, tipo = extrair_modalidade_e_tipo(titulo, local_str, empresa)
+            if is_remoto:
+                modalidade = "Remoto"
+                tipo = "Remoto"
 
             vagas.append({
                 "titulo": titulo,
                 "empresa": empresa,
-                "local": "Remoto (Brasil)" if is_remoto else local_str,
+                "local": "Remoto (Brasil)" if modalidade == "Remoto" else local_str,
                 "tipo": tipo,
-                "modalidade": "Remoto" if is_remoto else "Presencial",
+                "modalidade": modalidade,
                 "area": classificar_area(titulo),
                 "fonte": "Gupy",
                 "link": link
@@ -220,20 +234,21 @@ def raspar_gupy(termo_busca):
     return vagas
 
 # ==========================================
-# COORDENADOR DE ATUALIZAÇÃO
+# COORDENADOR GERAL
 # ==========================================
 def atualizar_banco():
     todas = []
     print("🚀 Buscando vagas em múltiplas plataformas...")
 
-    # 1. Buscas no LinkedIn
+    # Buscas no LinkedIn (Pernambuco Presencial e Brasil Remoto)
     buscas_linkedin = [
         {"cargo": "Tecnico de Suporte", "local": "Pernambuco, Brazil", "remoto": False},
         {"cargo": "Tecnico de Informatica", "local": "Pernambuco, Brazil", "remoto": False},
         {"cargo": "Suporte TI", "local": "Recife, Pernambuco, Brazil", "remoto": False},
         {"cargo": "Analista de Suporte", "local": "Recife, Pernambuco, Brazil", "remoto": False},
-        {"cargo": "Suporte Tecnico", "local": "Pernambuco, Brazil", "remoto": False},
-        {"cargo": "Suporte TI", "local": "Cabo de Santo Agostinho, Pernambuco, Brazil", "remoto": False},
+        {"cargo": "Suporte Tecnico", "local": "Cabo de Santo Agostinho, Pernambuco, Brazil", "remoto": False},
+        {"cargo": "Suporte", "local": "Ipojuca, Pernambuco, Brazil", "remoto": False},
+        {"cargo": "Desenvolvedor", "local": "Recife, Pernambuco, Brazil", "remoto": False},
         {"cargo": "Tecnico de Suporte Remoto", "local": "Brazil", "remoto": True},
         {"cargo": "Analista de Suporte Remoto", "local": "Brazil", "remoto": True},
         {"cargo": "Desenvolvedor Python", "local": "Brazil", "remoto": True},
@@ -242,23 +257,16 @@ def atualizar_banco():
     for b in buscas_linkedin:
         todas.extend(raspar_linkedin(b["cargo"], b["local"], b["remoto"]))
 
-    # 2. Buscas na Gupy
-    termos_gupy = ["Suporte TI", "Analista TI", "Técnico de Informática", "Desenvolvedor", "Python"]
+    # Buscas na Gupy
+    termos_gupy = ["Suporte TI", "Analista TI", "Técnico de Informática", "Desenvolvedor", "Python", "Redes"]
     for termo in termos_gupy:
         todas.extend(raspar_gupy(termo))
 
-    # 3. Buscas no InfoJobs
-    termos_infojobs = [
-        "suporte ti",
-        "tecnico informatica",
-        "analista suporte",
-        "analista ti",
-        "desenvolvedor"
-    ]
+    # Buscas no InfoJobs
+    termos_infojobs = ["suporte ti", "tecnico informatica", "analista suporte", "analista ti", "desenvolvedor"]
     for termo in termos_infojobs:
         todas.extend(raspar_infojobs(termo, uf="pe"))
 
-    # Recupera status de envio anterior
     enviadas_prev = {}
     if os.path.exists(ARQUIVO_CSV):
         try:
@@ -268,7 +276,6 @@ def atualizar_banco():
         except Exception:
             pass
 
-    # Deduplicação
     vistas = set()
     processadas = []
     id_n = 1
@@ -299,7 +306,7 @@ def atualizar_banco():
 
     df_novo = pd.DataFrame(processadas)
     df_novo.to_csv(ARQUIVO_CSV, index=False, encoding="utf-8")
-    print(f"✅ Banco consolidado com {len(df_novo)} vagas ativas (LinkedIn, Gupy e InfoJobs).")
+    print(f"✅ Banco consolidado com {len(df_novo)} vagas ativas e categorizadas.")
 
 if __name__ == "__main__":
     atualizar_banco()
