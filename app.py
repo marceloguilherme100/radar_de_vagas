@@ -20,7 +20,7 @@ def carregar_css(caminho_css):
 carregar_css("style.css")
 
 if not os.path.exists(ARQUIVO_CSV):
-    st.info("Banco de dados vazio. Clique no botão abaixo para buscar as primeiras vagas.")
+    st.info("Banco de dados vazio. Clique no botão abaixo para buscar as vagas.")
     if st.button("🔄 Buscar Vagas Agora", type="primary"):
         with st.spinner("Varrendo LinkedIn, Gupy e InfoJobs..."):
             atualizar_banco()
@@ -29,29 +29,25 @@ if not os.path.exists(ARQUIVO_CSV):
 
 df = pd.read_csv(ARQUIVO_CSV)
 
-# Garante a existência da coluna 'area'
+# Garante a integridade das colunas
 if "area" not in df.columns:
     df["area"] = df["titulo"].apply(
         lambda t: "Desenvolvimento" if any(k in str(t).lower() for k in ["dev", "programador", "software", "python", "frontend", "backend", "fullstack"]) else "Suporte / TI"
     )
 
-# Garante a existência da coluna 'enviada'
 if "enviada" not in df.columns:
     df["enviada"] = False
 else:
     df["enviada"] = df["enviada"].fillna(False).astype(bool)
 
-# Garante a existência da coluna 'tipo'
 if "tipo" not in df.columns:
     df["tipo"] = "Metropolitana / Recife"
 
-# Garante a existência da coluna 'modalidade'
 if "modalidade" not in df.columns:
     df["modalidade"] = df["local"].apply(
         lambda l: "Remoto" if any(k in str(l).lower() for k in ["remoto", "remote", "home office"]) else "Presencial"
     )
 
-# Garante a existência da coluna 'tags' e 'aderencia'
 if "tags" not in df.columns:
     df["tags"] = "TI Geral"
 if "aderencia" not in df.columns:
@@ -69,13 +65,30 @@ def identificar_fonte(vaga):
 
 df["fonte"] = df.apply(identificar_fonte, axis=1)
 
+# FILTRO TERRITORIAL ESTRITO:
+# Presenciais devem ser exclusivamente de Pernambuco; vagas de outros estados só entram se forem remotas.
+CIDADES_PE = [
+    "recife", "jaboatão", "jaboatao", "olinda", "paulista", 
+    "cabo de santo agostinho", "cabo", "ipojuca", "suape", 
+    "camaragibe", "abreu e lima", "igarassu", "são lourenço", 
+    "caruaru", "petrolina", "pernambuco", "pe"
+]
+
+def validar_territorio(linha):
+    if linha["modalidade"] == "Remoto":
+        return True
+    local = str(linha["local"]).lower()
+    return any(c in local for c in CIDADES_PE)
+
+df = df[df.apply(validar_territorio, axis=1)].copy()
+
 if "pagina_atual" not in st.session_state:
     st.session_state.pagina_atual = "Todas"
 
 def mudar_pagina(nome_pagina):
     st.session_state.pagina_atual = nome_pagina
 
-# Separação Estrita dos Datasets
+# SEPARAÇÃO MUTUAMENTE EXCLUSIVA
 ativas_df = df[df["enviada"] == False].copy()
 
 # 1. Apenas Remotas
@@ -84,7 +97,7 @@ df_remoto = ativas_df[ativas_df["modalidade"] == "Remoto"]
 # 2. Apenas Polo Industrial (Cabo, Ipojuca, Suape - Presencial)
 df_polo = ativas_df[(ativas_df["tipo"] == "Polo Industrial") & (ativas_df["modalidade"] != "Remoto")]
 
-# 3. Suporte / TI Presencial (Recife e Região Metropolitana, excluindo Polo e Remoto)
+# 3. Suporte / TI Presencial (Recife e Região Metropolitana, fora Polo)
 df_suporte = ativas_df[(ativas_df["area"] == "Suporte / TI") & (ativas_df["modalidade"] != "Remoto") & (ativas_df["tipo"] != "Polo Industrial")]
 
 # 4. Dev / Programação Presencial (Recife e Região)
@@ -93,7 +106,7 @@ df_dev = ativas_df[(ativas_df["area"] == "Desenvolvimento") & (ativas_df["modali
 # 5. Enviadas
 df_enviadas = df[df["enviada"] == True].copy()
 
-# Contadores dos Cards
+# Contadores
 total_ativas = len(ativas_df)
 suporte_cnt = len(df_suporte)
 dev_cnt = len(df_dev)
@@ -140,7 +153,7 @@ with c6:
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# Lógica de Exibição Filtrada
+# Lógica de Filtragem e Exibição
 if st.session_state.pagina_atual == "Enviadas":
     st.subheader(f"📤 Candidaturas Realizadas ({enviadas_cnt})")
     df_exibicao = df_enviadas
