@@ -264,6 +264,8 @@ def raspar_gupy(termo_busca):
 # ==========================================
 # COORDENADOR GERAL
 # ==========================================
+
+
 def atualizar_banco():
     todas = []
     print("🚀 Buscando vagas em múltiplas plataformas...")
@@ -292,8 +294,13 @@ def atualizar_banco():
     for termo in termos_infojobs:
         todas.extend(raspar_infojobs(termo, uf="pe"))
 
+    colunas_padrao = [
+        "id", "titulo", "empresa", "local", "tipo",
+        "modalidade", "area", "fonte", "aderencia", "tags", "link", "enviada"
+    ]
+
     enviadas_prev = {}
-    if os.path.exists(ARQUIVO_CSV):
+    if os.path.exists(ARQUIVO_CSV) and os.path.getsize(ARQUIVO_CSV) > 0:
         try:
             df_old = pd.read_csv(ARQUIVO_CSV)
             if "link" in df_old.columns and "enviada" in df_old.columns:
@@ -328,6 +335,12 @@ def atualizar_banco():
             "enviada": bool(enviadas_prev.get(v["link"], False))
         })
         id_n += 1
+
+    if not processadas:
+        print("⚠️ Nenhuma vaga nova capturada nos filtros. Preservando banco existente.")
+        if not os.path.exists(ARQUIVO_CSV) or os.path.getsize(ARQUIVO_CSV) == 0:
+            pd.DataFrame(columns=colunas_padrao).to_csv(ARQUIVO_CSV, index=False, encoding="utf-8")
+        return
 
     df_novo = pd.DataFrame(processadas)
     df_novo.to_csv(ARQUIVO_CSV, index=False, encoding="utf-8")

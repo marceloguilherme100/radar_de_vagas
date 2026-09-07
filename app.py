@@ -18,22 +18,26 @@ def carregar_css(caminho_css):
             st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 carregar_css("style.css")
+COLUNAS_OBRIGATORIAS = [
+    "id", "titulo", "empresa", "local", "tipo", 
+    "modalidade", "area", "fonte", "aderencia", "tags", "link", "enviada"
+]
 
-# Verificação segura de banco existente e não vazio
-banco_vazio = False
-
-if not os.path.exists(ARQUIVO_CSV) or os.path.getsize(ARQUIVO_CSV) == 0:
-    banco_vazio = True
-else:
+def carregar_dados():
+    if not os.path.exists(ARQUIVO_CSV) or os.path.getsize(ARQUIVO_CSV) == 0:
+        return pd.DataFrame(columns=COLUNAS_OBRIGATORIAS)
     try:
-        df = pd.read_csv(ARQUIVO_CSV)
-        if df.empty:
-            banco_vazio = True
+        dados = pd.read_csv(ARQUIVO_CSV)
+        return dados
     except (pd.errors.EmptyDataError, Exception):
-        banco_vazio = True
+        return pd.DataFrame(columns=COLUNAS_OBRIGATORIAS)
 
-if banco_vazio:
-    st.info("O banco de vagas está vazio. Clique no botão abaixo para iniciar a coleta.")
+df = carregar_dados()
+
+# Se não houver vagas ou colunas válidas, permite buscar sem quebrar a tela
+if df.empty or "titulo" not in df.columns:
+    st.markdown("<h1 style='margin-top: 0;'>🎯 Radar de Oportunidades</h1>", unsafe_allow_html=True)
+    st.info("O banco de vagas está vazio ou aguardando primeira sincronização.")
     if st.button("🔄 Buscar Vagas Agora", type="primary"):
         with st.spinner("Varrendo LinkedIn, Gupy e InfoJobs..."):
             atualizar_banco()
