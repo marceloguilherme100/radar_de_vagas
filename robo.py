@@ -7,6 +7,7 @@ from bs4 import BeautifulSoup
 
 ARQUIVO_CSV = "vagas.csv"
 
+# Regex para competências e aderência
 SKILLS_REGEX = {
     "Suporte / Helpdesk": r"\bsuporte\b|\bhelpdesk\b|\bservice desk\b|\bn1\b|\bn2\b|\bt[eé]cnico de inform[aá]tica\b",
     "Infraestrutura / Redes": r"\binfraestrutura\b|\bredes\b|\bhardware\b|\bactive directory\b|\bmikrotik\b",
@@ -18,11 +19,26 @@ SKILLS_REGEX = {
     "Automação / RPA": r"\bautoma[cç][aã]o\b|\brpa\b"
 }
 
+# Termos para identificar o Polo Industrial
 POLO_KEYWORDS = [
     "suape", "cabo de santo agostinho", "cabo", "ipojuca", 
     "porto de suape", "complexo de suape", "complexo industrial", 
     "indústria", "industria", "estaleiro", "refinaria"
 ]
+
+# Regex seguro para cidades e sigla de Pernambuco
+PADRAO_PE = re.compile(
+    r"\b(recife|jaboat[aã]o|olinda|paulista|cabo de santo agostinho|ipojuca|suape|camaragibe|abreu e lima|igarassu|s[aã]o louren[cç]o|caruaru|petrolina|pernambuco)\b|"
+    r"(\bpe\b|[\-_/]pe[\-_/.]|,\s*pe\b)",
+    re.IGNORECASE
+)
+
+# Regex para detectar explicitamente outros estados
+PADRAO_OUTROS_ESTADOS = re.compile(
+    r"(\b(sc|sp|rj|mg|rs|pr|ba|ce|df|es|go|ma|mt|ms|pa|pb|pi|rn|ro|rr|se|to|am|ac|al|ap)\b|"
+    r"[\-_/](sc|sp|rj|mg|rs|pr|ba|ce|df|es|go|ma|mt|ms|pa|pb|pi|rn|ro|rr|se|to|am|ac|al|ap)[\-_/.])",
+    re.IGNORECASE
+)
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
@@ -58,7 +74,6 @@ def limpar_link(url_bruta):
     return f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
 
 def vaga_ainda_ativa(url_vaga):
-    """Verifica se a vaga já foi encerrada."""
     try:
         res = requests.get(url_vaga, headers=HEADERS, timeout=6, allow_redirects=True)
         if res.status_code != 200:
@@ -74,13 +89,19 @@ def vaga_ainda_ativa(url_vaga):
             "topcard__flavor--closed",
             "job-details-jobs-unified-top-card__closed-message"
         ]
-        
-        if any(termo in texto_pagina for termo in termos_fechada):
-            return False
-            
-        return True
+        return not any(termo in texto_pagina for termo in termos_fechada)
     except Exception:
         return True
+
+def validar_localidade_pe(modalidade, local_texto, link):
+    if modalidade == "Remoto":
+        return True
+    
+    analise = f"{local_texto} {link}".lower()
+    tem_pe = bool(PADRAO_PE.search(analise))
+    tem_outro = bool(PADRAO_OUTROS_ESTADOS.search(analise))
+    
+    return tem_pe and not (tem_outro and not tem_pe)
 
 # ==========================================
 # FONTE 1: LINKEDIN
@@ -90,7 +111,6 @@ def raspar_linkedin(cargo, localidade, apenas_remoto=False):
     q_enc = urllib.parse.quote(cargo)
     loc_enc = urllib.parse.quote(localidade)
     
-    # f_TPR=r259200 busca vagas dos últimos 3 dias para evitar repetições antigas
     url = f"https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?keywords={q_enc}&location={loc_enc}&f_TPR=r259200&start=0"
     if apenas_remoto:
         url += "&f_WT=2"
@@ -121,6 +141,10 @@ def raspar_linkedin(cargo, localidade, apenas_remoto=False):
                 if apenas_remoto:
                     modalidade = "Remoto"
                     tipo = "Remoto"
+                
+                # Bloqueia vagas presenciais fora de PE
+                if not validar_localidade_pe(modalidade, local, link):
+                    continue
                 
                 vagas.append({
                     "titulo": titulo,
@@ -155,24 +179,32 @@ def raspar_infojobs(termo_busca, uf="pe"):
         for card in cards:
             tit_elem = card.find("h2") or card.find("a", class_=lambda c: c and "title" in c)
             emp_elem = card.find("div", class_=lambda c: c and "company" in c) or card.find("a", class_=lambda c: c and "company" in c)
-            loc_elem = card.find("div", class_=lambda c: c and "location" in c) or card.find("span", class_=lambda c: c and "location" in c)
+            loc_elem = (
+                card.find("span", class_=lambda c: c and "location" in c) or
+                card.find("div", class_=lambda c: c and "location" in c) or
+                card.find("div", class_=lambda c: c and "city" in c)
+            )
             lnk_elem = card.find("a", href=True)
             
             if tit_elem and lnk_elem:
                 titulo = tit_elem.get_text(strip=True)
                 empresa = emp_elem.get_text(strip=True) if emp_elem else "Empresa Confidencial"
-                local = loc_elem.get_text(strip=True) if loc_elem else "Pernambuco"
+                local_real = loc_elem.get_text(strip=True) if loc_elem else ""
                 
                 link_rel = lnk_elem["href"]
                 link_comp = link_rel if link_rel.startswith("http") else f"https://www.infojobs.com.br{link_rel}"
                 link_limpo = limpar_link(link_comp)
                 
-                modalidade, tipo = extrair_modalidade_e_tipo(titulo, local, empresa)
+                modalidade, tipo = extrair_modalidade_e_tipo(titulo, local_real, empresa)
+                
+                # Bloqueia vagas de fora de PE
+                if not validar_localidade_pe(modalidade, local_real, link_limpo):
+                    continue
                 
                 vagas.append({
                     "titulo": titulo,
                     "empresa": empresa,
-                    "local": "Remoto (Brasil)" if modalidade == "Remoto" else local,
+                    "local": "Remoto (Brasil)" if modalidade == "Remoto" else (local_real if local_real else "Recife e Região, PE"),
                     "tipo": tipo,
                     "modalidade": modalidade,
                     "area": classificar_area(titulo),
@@ -206,18 +238,14 @@ def raspar_gupy(termo_busca):
             link = item.get("jobUrl", "")
             
             local_str = f"{cidade} - {estado}" if cidade else ("Remoto" if is_remoto else "Brasil")
-            local_lower = f"{local_str} {cidade} {estado}".lower()
-            
-            valido_pe = any(c in local_lower for c in ["recife", "cabo", "ipojuca", "suape", "pernambuco", "pe", "jaboatão"])
-            
-            # Descarta se não for remoto nem de Pernambuco
-            if not (is_remoto or valido_pe):
-                continue
-                
             modalidade, tipo = extrair_modalidade_e_tipo(titulo, local_str, empresa)
             if is_remoto:
                 modalidade = "Remoto"
                 tipo = "Remoto"
+            
+            # Bloqueia vagas presenciais fora de PE
+            if not validar_localidade_pe(modalidade, local_str, link):
+                continue
 
             vagas.append({
                 "titulo": titulo,
@@ -240,7 +268,6 @@ def atualizar_banco():
     todas = []
     print("🚀 Buscando vagas em múltiplas plataformas...")
 
-    # Buscas no LinkedIn (Pernambuco Presencial e Brasil Remoto)
     buscas_linkedin = [
         {"cargo": "Tecnico de Suporte", "local": "Pernambuco, Brazil", "remoto": False},
         {"cargo": "Tecnico de Informatica", "local": "Pernambuco, Brazil", "remoto": False},
@@ -257,12 +284,10 @@ def atualizar_banco():
     for b in buscas_linkedin:
         todas.extend(raspar_linkedin(b["cargo"], b["local"], b["remoto"]))
 
-    # Buscas na Gupy
     termos_gupy = ["Suporte TI", "Analista TI", "Técnico de Informática", "Desenvolvedor", "Python", "Redes"]
     for termo in termos_gupy:
         todas.extend(raspar_gupy(termo))
 
-    # Buscas no InfoJobs
     termos_infojobs = ["suporte ti", "tecnico informatica", "analista suporte", "analista ti", "desenvolvedor"]
     for termo in termos_infojobs:
         todas.extend(raspar_infojobs(termo, uf="pe"))

@@ -67,6 +67,12 @@ df["fonte"] = df.apply(identificar_fonte, axis=1)
 
 # FILTRO TERRITORIAL ESTRITO:
 # Presenciais devem ser exclusivamente de Pernambuco; vagas de outros estados só entram se forem remotas.
+UFS_FORA_PE = [
+    "-sc", "-sp", "-rj", "-mg", "-rs", "-pr", "-ba", "-ce", "-df", 
+    "/sc/", "/sp/", "/rj/", "/mg/", "/rs/", "/pr/", "/ba/", "/ce/", "/df/",
+    "santa catarina", "são paulo", "sao paulo", "rio de janeiro", "brasília", "brasilia"
+]
+
 CIDADES_PE = [
     "recife", "jaboatão", "jaboatao", "olinda", "paulista", 
     "cabo de santo agostinho", "cabo", "ipojuca", "suape", 
@@ -77,8 +83,15 @@ CIDADES_PE = [
 def validar_territorio(linha):
     if linha["modalidade"] == "Remoto":
         return True
-    local = str(linha["local"]).lower()
-    return any(c in local for c in CIDADES_PE)
+    
+    local = str(linha.get("local", "")).lower()
+    link = str(linha.get("link", "")).lower()
+    
+    # Se a URL ou o texto contiver menção a outro estado/UF fora de PE, descarta
+    if any(uf in link or uf in local for uf in UFS_FORA_PE):
+        return False
+        
+    return any(c in local or c in link for c in CIDADES_PE)
 
 df = df[df.apply(validar_territorio, axis=1)].copy()
 
