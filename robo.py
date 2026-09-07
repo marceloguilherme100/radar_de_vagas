@@ -161,20 +161,42 @@ def raspar_linkedin(cargo, localidade, apenas_remoto=False):
     return vagas
 
 # ==========================================
-# FONTE 2: INFOJOBS
+# FONTE 2: INFOJOBS (Com Session e Headers Anti-Bloqueio)
 # ==========================================
 def raspar_infojobs(termo_busca, uf="pe"):
     vagas = []
     slug_termo = termo_busca.lower().strip().replace(" ", "-")
     url = f"https://www.infojobs.com.br/vagas-de-emprego-{slug_termo}-em-{uf}.aspx"
     
+    session = requests.Session()
+    headers_infojobs = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Referer": "https://www.infojobs.com.br/",
+        "Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"Windows"',
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "same-origin",
+        "Upgrade-Insecure-Requests": "1"
+    }
+    
     try:
-        res = requests.get(url, headers=HEADERS, timeout=12)
+        res = session.get(url, headers=headers_infojobs, timeout=12)
         if res.status_code != 200:
+            print(f"⚠️ InfoJobs [{termo_busca}]: HTTP {res.status_code}")
             return vagas
             
         soup = BeautifulSoup(res.text, "html.parser")
-        cards = soup.find_all("div", class_=lambda c: c and "js_vacancy" in c) or soup.find_all("div", attrs={"data-js": "vacancy-item"})
+        
+        # Mapeia múltiplos padrões de container de vaga do InfoJobs
+        cards = (
+            soup.find_all("div", attrs={"data-js": "vacancy-item"}) or 
+            soup.find_all("div", class_=lambda c: c and "js_vacancy" in c) or
+            soup.find_all("div", class_=lambda c: c and "element-vaga" in c)
+        )
         
         for card in cards:
             tit_elem = card.find("h2") or card.find("a", class_=lambda c: c and "title" in c)
@@ -189,7 +211,7 @@ def raspar_infojobs(termo_busca, uf="pe"):
             if tit_elem and lnk_elem:
                 titulo = tit_elem.get_text(strip=True)
                 empresa = emp_elem.get_text(strip=True) if emp_elem else "Empresa Confidencial"
-                local_real = loc_elem.get_text(strip=True) if loc_elem else ""
+                local_real = loc_elem.get_text(strip=True) if loc_elem else "Pernambuco, PE"
                 
                 link_rel = lnk_elem["href"]
                 link_comp = link_rel if link_rel.startswith("http") else f"https://www.infojobs.com.br{link_rel}"
@@ -197,14 +219,13 @@ def raspar_infojobs(termo_busca, uf="pe"):
                 
                 modalidade, tipo = extrair_modalidade_e_tipo(titulo, local_real, empresa)
                 
-                # Bloqueia vagas de fora de PE
                 if not validar_localidade_pe(modalidade, local_real, link_limpo):
                     continue
                 
                 vagas.append({
                     "titulo": titulo,
                     "empresa": empresa,
-                    "local": "Remoto (Brasil)" if modalidade == "Remoto" else (local_real if local_real else "Recife e Região, PE"),
+                    "local": "Remoto (Brasil)" if modalidade == "Remoto" else local_real,
                     "tipo": tipo,
                     "modalidade": modalidade,
                     "area": classificar_area(titulo),
@@ -216,34 +237,51 @@ def raspar_infojobs(termo_busca, uf="pe"):
         
     return vagas
 
+
 # ==========================================
-# FONTE 3: GUPY
+# FONTE 3: GUPY (API com headers oficiais do portal)
 # ==========================================
 def raspar_gupy(termo_busca):
     vagas = []
-    url = f"https://portal.api.gupy.io/api/v1/jobs?jobName={urllib.parse.quote(termo_busca)}&limit=25"
+    # Endpoint oficial de busca do Portal de Carreiras da Gupy
+    url = f"https://portal.api.gupy.io/api/v1/jobs?jobName={urllib.parse.quote(termo_busca)}&limit=30&offset=0"
+    
+    headers_gupy = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Origin": "https://portal.gupy.io",
+        "Referer": "https://portal.gupy.io/",
+        "Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124"',
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-site"
+    }
     
     try:
-        res = requests.get(url, headers=HEADERS, timeout=10)
+        res = requests.get(url, headers=headers_gupy, timeout=12)
         if res.status_code != 200:
+            print(f"⚠️ Gupy [{termo_busca}]: HTTP {res.status_code}")
             return vagas
             
         dados = res.json()
-        for item in dados.get("data", []):
+        itens = dados.get("data", [])
+        
+        for item in itens:
             titulo = item.get("name", "")
-            empresa = item.get("careerPageName", "Empresa via Gupy")
+            empresa = item.get("careerPageName", "Empresa parceira Gupy")
             cidade = item.get("city", "")
             estado = item.get("state", "")
             is_remoto = item.get("isRemoteWork", False)
             link = item.get("jobUrl", "")
             
-            local_str = f"{cidade} - {estado}" if cidade else ("Remoto" if is_remoto else "Brasil")
+            local_str = f"{cidade} - {estado}" if (cidade and estado) else ("Remoto" if is_remoto else "Brasil")
             modalidade, tipo = extrair_modalidade_e_tipo(titulo, local_str, empresa)
+            
             if is_remoto:
                 modalidade = "Remoto"
                 tipo = "Remoto"
             
-            # Bloqueia vagas presenciais fora de PE
+            # Valida territorialidade (apenas PE se presencial, ou aceita se remoto)
             if not validar_localidade_pe(modalidade, local_str, link):
                 continue
 
@@ -259,6 +297,7 @@ def raspar_gupy(termo_busca):
             })
     except Exception as e:
         print(f"Erro Gupy ({termo_busca}): {e}")
+        
     return vagas
 
 # ==========================================
