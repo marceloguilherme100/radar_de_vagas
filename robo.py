@@ -33,10 +33,11 @@ PADRAO_PE = re.compile(
     re.IGNORECASE
 )
 
-# Regex para detectar explicitamente outros estados
+# Regex para detectar explicitamente outros estados (inclusive em URLs como -sp.aspx, -sc.aspx)
 PADRAO_OUTROS_ESTADOS = re.compile(
     r"(\b(sc|sp|rj|mg|rs|pr|ba|ce|df|es|go|ma|mt|ms|pa|pb|pi|rn|ro|rr|se|to|am|ac|al|ap)\b|"
-    r"[\-_/](sc|sp|rj|mg|rs|pr|ba|ce|df|es|go|ma|mt|ms|pa|pb|pi|rn|ro|rr|se|to|am|ac|al|ap)[\-_/.])",
+    r"[\-_/](sc|sp|rj|mg|rs|pr|ba|ce|df|es|go|ma|mt|ms|pa|pb|pi|rn|ro|rr|se|to|am|ac|al|ap)(\.aspx|[\-_/.])|"
+    r"\b(s[aã]o paulo|rio de janeiro|santa catarina|bras[ií]lia|paran[aá]|rio grande do sul|minas gerais|salvador|fortaleza|curitiba|florian[oó]polis)\b)",
     re.IGNORECASE
 )
 
@@ -98,10 +99,14 @@ def validar_localidade_pe(modalidade, local_texto, link):
         return True
     
     analise = f"{local_texto} {link}".lower()
-    tem_pe = bool(PADRAO_PE.search(analise))
-    tem_outro = bool(PADRAO_OUTROS_ESTADOS.search(analise))
+    tem_outro_estado = bool(PADRAO_OUTROS_ESTADOS.search(analise))
     
-    return tem_pe and not (tem_outro and not tem_pe)
+    # Se a URL ou local cita outro estado, descarta imediatamente
+    if tem_outro_estado:
+        return False
+        
+    tem_pe = bool(PADRAO_PE.search(analise))
+    return tem_pe
 
 # ==========================================
 # FONTE 1: LINKEDIN
@@ -142,7 +147,6 @@ def raspar_linkedin(cargo, localidade, apenas_remoto=False):
                     modalidade = "Remoto"
                     tipo = "Remoto"
                 
-                # Bloqueia vagas presenciais fora de PE
                 if not validar_localidade_pe(modalidade, local, link):
                     continue
                 
@@ -161,7 +165,7 @@ def raspar_linkedin(cargo, localidade, apenas_remoto=False):
     return vagas
 
 # ==========================================
-# FONTE 2: INFOJOBS (Com Session e Headers Anti-Bloqueio)
+# FONTE 2: INFOJOBS
 # ==========================================
 def raspar_infojobs(termo_busca, uf="pe"):
     vagas = []
@@ -190,8 +194,6 @@ def raspar_infojobs(termo_busca, uf="pe"):
             return vagas
             
         soup = BeautifulSoup(res.text, "html.parser")
-        
-        # Mapeia múltiplos padrões de container de vaga do InfoJobs
         cards = (
             soup.find_all("div", attrs={"data-js": "vacancy-item"}) or 
             soup.find_all("div", class_=lambda c: c and "js_vacancy" in c) or
@@ -211,7 +213,9 @@ def raspar_infojobs(termo_busca, uf="pe"):
             if tit_elem and lnk_elem:
                 titulo = tit_elem.get_text(strip=True)
                 empresa = emp_elem.get_text(strip=True) if emp_elem else "Empresa Confidencial"
-                local_real = loc_elem.get_text(strip=True) if loc_elem else "Pernambuco, PE"
+                
+                # Se não houver cidade explícita no card, fica vazio (não assume Pernambuco)
+                local_real = loc_elem.get_text(strip=True) if loc_elem else ""
                 
                 link_rel = lnk_elem["href"]
                 link_comp = link_rel if link_rel.startswith("http") else f"https://www.infojobs.com.br{link_rel}"
@@ -219,13 +223,14 @@ def raspar_infojobs(termo_busca, uf="pe"):
                 
                 modalidade, tipo = extrair_modalidade_e_tipo(titulo, local_real, empresa)
                 
+                # Se não for de PE ou apontar para outro estado, descarta
                 if not validar_localidade_pe(modalidade, local_real, link_limpo):
                     continue
                 
                 vagas.append({
                     "titulo": titulo,
                     "empresa": empresa,
-                    "local": "Remoto (Brasil)" if modalidade == "Remoto" else local_real,
+                    "local": "Remoto (Brasil)" if modalidade == "Remoto" else (local_real if local_real else "Pernambuco, PE"),
                     "tipo": tipo,
                     "modalidade": modalidade,
                     "area": classificar_area(titulo),
@@ -237,13 +242,11 @@ def raspar_infojobs(termo_busca, uf="pe"):
         
     return vagas
 
-
 # ==========================================
-# FONTE 3: GUPY (API com headers oficiais do portal)
+# FONTE 3: GUPY
 # ==========================================
 def raspar_gupy(termo_busca):
     vagas = []
-    # Endpoint oficial de busca do Portal de Carreiras da Gupy
     url = f"https://portal.api.gupy.io/api/v1/jobs?jobName={urllib.parse.quote(termo_busca)}&limit=30&offset=0"
     
     headers_gupy = {
@@ -281,7 +284,6 @@ def raspar_gupy(termo_busca):
                 modalidade = "Remoto"
                 tipo = "Remoto"
             
-            # Valida territorialidade (apenas PE se presencial, ou aceita se remoto)
             if not validar_localidade_pe(modalidade, local_str, link):
                 continue
 
@@ -303,8 +305,6 @@ def raspar_gupy(termo_busca):
 # ==========================================
 # COORDENADOR GERAL
 # ==========================================
-
-
 def atualizar_banco():
     todas = []
     print("🚀 Buscando vagas em múltiplas plataformas...")
